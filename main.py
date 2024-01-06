@@ -22,19 +22,21 @@ class Node:
             currentNode = currentNode.parent
         return currentNode
     
-    def initialize_top_hits(self, sequences, m):
+    def initialize_top_hits(self, active_nodes, m):
         # Assuming 'sequences' is a list of sequences and self.profile is the profile of the current node
+        #active_nodes cannot contain seed
         top_hits = []
-        for seq in sequences:
+        for seq in active_nodes:
             score = profileDistance(self.profile, seq.profile)
             top_hits.append((seq, score))
 
-        # Sort based on score and select top m hits
+        # Sort based on score
         top_hits.sort(key=lambda x: x[1], reverse=True)
         self.topHits = top_hits
+        self.topHits = top_hits[:m]
     
     def approximate_top_hits_for_neighbors(self, neighbors, seed_top_hits, m):
-        # Assuming 'neighbors' is a list of neighbor nodes
+        # Assuming 'neighbors' is a list of neighbor nodes (which we get from the top_hits seed)
         # and 'seed_top_hits' is the top 2m hits of the seed
         for neighbor in neighbors:
             neighbor_hits = []
@@ -45,7 +47,39 @@ class Node:
             neighbor_hits.sort(key=lambda x: x[1], reverse=True)
             neighbor.topHits = neighbor_hits[:m]
 
+    def refresh_top_hits(self, active_nodes, m):
+        # Re-compute the top-hit list
+        new_top_hits = []
+        for node in active_nodes:
+            if node is not self:
+                score = profileDistance(self.profile, node.profile)
+                new_top_hits.append((node, score))
 
+        new_top_hits.sort(key=lambda x: x[1], reverse=True)
+        self.topHits = new_top_hits[:m]
+
+        # Update the close neighbors' top-hit lists
+        for neighbor, _ in self.topHits[:m]:
+            neighbor.approximate_top_hits_for_neighbors([self], self.topHits, m)
+    
+
+
+def update_top_hits_on_merge(sequence, other_sequence, m):
+    #updates the top hits of seq A and B to the top m hits combined. 
+    merged_hits = sorted(sequence.topHits + other_sequence.topHits, key=lambda x: x[1], reverse=True)
+
+    combined_hits = []
+    seen_seqs = set()
+    for seq, score in merged_hits:
+        if seq not in seen_seqs and seq not in {sequence, other_sequence}:
+            combined_hits.append((seq, score))
+            seen_seqs.add(seq)
+
+        # Break if combined_hits reaches desired length
+        if len(combined_hits) == m:
+            break
+    return combined_hits
+    
 
 
 
