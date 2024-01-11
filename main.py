@@ -13,7 +13,8 @@ class Node:
         self.parent = parent
         self.profile = profile
         self.active = True
-        self.topHits = []
+        self.bestHit = None
+        self.bestHitDistance = float('inf')
 
     def findActiveAncestor(self) -> 'Node':
         currentNode = self
@@ -22,7 +23,7 @@ class Node:
         return currentNode
 
 
-# Globals
+# =========================== Globals =======================================
 ALPHABET = 'ACGT'
 DATA_FILE = 'test-small.aln'
 JOIN_ITERATIONS = 200
@@ -30,7 +31,6 @@ JOINS_DONE = 0
 GENOME_LENGTH = 0
 MAX_ID = 0
 m = 0
-ACTIVE_NODES = 0
 
 # ======================= Util functions ====================================
 def readFile(fileName: str) -> list[str]:
@@ -47,17 +47,26 @@ def readFile(fileName: str) -> list[str]:
 def createSeed(alphabet: str = ALPHABET, length: int = GENOME_LENGTH) -> str:
     return ''.join(random.choice(alphabet) for _ in range(length))
 
+def createNewick(node: Node) -> str:
+    output = '('
+    for child in node.children:
+        if not child.children:
+            output += str(child.nodeId) + ','
+        else:
+            output += createNewick(child)
+    output = output[:-1] + ');'
+    return output
 
 # ======================= Algorithm functions ================================
-def initializeProfile(genome: str = '') -> profile:
+def initializeProfile(genome: str, length: int, alphabet: str) -> profile:
     if genome == '':
-        return [{base: 0 for base in ALPHABET} for _ in range(GENOME_LENGTH)]
+        return [{base: 0 for base in alphabet} for _ in range(length)]
 
-    return [{base: float(genome[i] == base) for base in ALPHABET} for i in range(GENOME_LENGTH)]
+    return [{base: float(genome[i] == base) for base in alphabet} for i in range(len(genome))]
 
 def computeTotalProfile() -> profile:
     nodesToCheck = [ROOT_NODE]
-    newProfile = initializeProfile()
+    newProfile = initializeProfile('', GENOME_LENGTH, ALPHABET)
     global ACTIVE_NODES
     ACTIVE_NODES = -1
 
@@ -104,52 +113,80 @@ def upDistance(node: Node) -> float:
 
 def mergeNodes(node1: Node, node2: Node):
     global MAX_ID
-    MAX_ID += 1
+    # Merge nodes and add them to root
     newNode = Node(MAX_ID, ROOT_NODE, mergeProfiles(node1.profile, node2.profile))
     ROOT_NODE.children.remove(node1)
     ROOT_NODE.children.remove(node2)
     ROOT_NODE.children.append(newNode)
     newNode.children = [node1, node2]
+    node1.parent = newNode
+    node2.parent = newNode
     node1.active = False
     node2.active = False
+    MAX_ID += 1
+
+    global TOTAL_PROFILE
+    for i in range(GENOME_LENGTH):
+        for letter in ALPHABET:
+            TOTAL_PROFILE[i][letter] = ((MAX_ID - 1) * TOTAL_PROFILE[i][letter] + newNode.profile[i][letter]) / MAX_ID
+
+    # Update the best hits
+    for child in ROOT_NODE.children:
+        if child.nodeId == newNode.nodeId:
+            continue
+        distance = nodeDistance(child, newNode)
+        if distance < newNode.bestHitDistance:
+            newNode.bestHit = child
+        if distance < child.bestHitDistance:
+            child.bestHit = newNode
+            child.bestHitDistance = distance
+        if not child.bestHit.active:
+            child.bestHit = child.findActiveAncestor()
+            child.bestHitDistance = distance
+
+    # Recompute total profile after a certain number of iterations
     global JOINS_DONE
     JOINS_DONE += 1
 
     if JOINS_DONE >= JOIN_ITERATIONS:
-        global TOTAL_PROFILE
         TOTAL_PROFILE = computeTotalProfile()
 
 def outDistance(node: Node) -> float:
     if node.children:
-        return ACTIVE_NODES * profileDistance(node.profile, TOTAL_PROFILE) - profileDistance(node.children[0].profile, node.children[1].profile)
+        return len(ROOT_NODE.children) * profileDistance(node.profile, TOTAL_PROFILE) - profileDistance(node.children[0].profile, node.children[1].profile)
 
-    return ACTIVE_NODES * profileDistance(node.profile, TOTAL_PROFILE)
-
-def topHits(node: Node):
-    pass
-
+    return len(ROOT_NODE.children) * profileDistance(node.profile, TOTAL_PROFILE)
 
 # =============================== Algorithm =======================================
-data = readFile(DATA_FILE)
-GENOME_LENGTH = len(data[0])
 
-# Create initial topology
-ROOT_NODE = Node(-1, None, initializeProfile(''))
 
-for genome in data:
-    ROOT_NODE.children.append(Node(MAX_ID, ROOT_NODE, initializeProfile(genome)))
-    MAX_ID += 1
+if __name__ == '__main__':
+    data = readFile(DATA_FILE)
+    GENOME_LENGTH = len(data[0])
 
-# Create total profile
-TOTAL_PROFILE = computeTotalProfile()
+    # Create initial star topology
+    ROOT_NODE = Node(-1, None, initializeProfile('', GENOME_LENGTH, ALPHABET))
+    for genome in data:
+        ROOT_NODE.children.append(Node(MAX_ID, ROOT_NODE, initializeProfile(genome, GENOME_LENGTH, ALPHABET)))
+        MAX_ID += 1
 
-# Find the top hits for each sequence
-m = len(data) ** 0.5
-seed = createSeed(ALPHABET, GENOME_LENGTH)
-results = []
+    # Create total profile
+    TOTAL_PROFILE = computeTotalProfile()
 
-for child in ROOT_NODE.children:
-    results.append(outDistance(child))
+    # Create top hits list for each node
+    while len(ROOT_NODE.children) > 2:
+        bestMatch = (None, None)
+        bestValue = float("inf")
+        for child in ROOT_NODE.children:
+            for otherChild in ROOT_NODE.children:
+                if child.nodeId != otherChild.nodeId:
+                    continue
+                dist = nodeDistance(child, otherChild)
+                if dist < bestValue:
+                    bestMatch = (child, otherChild)
+                    bestValue = dist
 
-# TODO work it out
+        mergeNodes(bestMatch[0], bestMatch[1])
 
+
+    print(createNewick(ROOT_NODE))
