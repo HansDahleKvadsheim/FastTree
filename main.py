@@ -49,11 +49,10 @@ class Node:
 # =========================== Globals =======================================
 ALPHABET = 'ACGT'
 DATA_FILE = 'test-small.aln'
-JOIN_ITERATIONS = 200
-JOINS_DONE = 0
 GENOME_LENGTH = 0
 MAX_ID = 0
 m = 0
+ROOT_NODE = None
 
 # ======================= Util functions ====================================
 def readFile(fileName: str) -> list[str]:
@@ -81,34 +80,27 @@ def createNewick(node: Node) -> str:
     return output
 
 # ======================= Algorithm functions ================================
-def initializeProfile(genome: str, length: int, alphabet: str) -> profile:
+def initializeProfile(genome: str, length: int, alphabet: str = ALPHABET) -> profile:
     if genome == '':
         return [{base: 0 for base in alphabet} for _ in range(length)]
 
     return [{base: float(genome[i] == base) for base in alphabet} for i in range(len(genome))]
 
-def computeTotalProfile() -> profile:
-    nodesToCheck = [ROOT_NODE]
-    newProfile = initializeProfile('', GENOME_LENGTH, ALPHABET)
-    global ACTIVE_NODES
-    ACTIVE_NODES = -1
+def computeTotalProfile(startNode: Node = ROOT_NODE) -> profile:
+    genomeLength = len(startNode.children[0].profile)
+    alphabet = startNode.children[0].profile[0].keys()
+    totalProfile = initializeProfile('', genomeLength, alphabet)
 
-    while nodesToCheck:
-        currentNode = nodesToCheck.pop(0)
-        for i in range(GENOME_LENGTH):
-            for key in currentNode.profile[i]:
-                newProfile[i][key] += currentNode.profile[i][key]
+    for child in startNode.children:
+        for i in range(genomeLength):
+            for key in child.profile[i].keys():
+                totalProfile[i][key] += child.profile[i][key]
 
-        for child in currentNode.children:
-            if child.active:
-                nodesToCheck.append(child)
-        ACTIVE_NODES += 1
+    for i in range(genomeLength):
+        for key in totalProfile[i]:
+            totalProfile[i][key] = totalProfile[i][key] / len(startNode.children)
 
-    for i in range(GENOME_LENGTH):
-        for key in newProfile[i]:
-            newProfile[i][key] = newProfile[i][key] / ACTIVE_NODES
-
-    return newProfile
+    return totalProfile
 
 def mergeProfiles(profile1: profile, profile2: profile):
     genomeLength = len(profile1)
@@ -170,12 +162,6 @@ def mergeNodes(node1: Node, node2: Node):
             child.bestHit = child.findActiveAncestor()
             child.bestHitDistance = distance
 
-    # Recompute total profile after a certain number of iterations
-    global JOINS_DONE
-    JOINS_DONE += 1
-
-    if JOINS_DONE >= JOIN_ITERATIONS:
-        TOTAL_PROFILE = computeTotalProfile()
 
 def outDistance(node: Node) -> float:
     if node.children:
@@ -215,21 +201,3 @@ if __name__ == '__main__':
 
     for seq in ROOT_NODE.children:
         print(seq.topHits)
-
-    # Create top hits list for each node
-    while len(ROOT_NODE.children) > 2:
-        bestMatch = (None, None)
-        bestValue = float("inf")
-        for child in ROOT_NODE.children:
-            for otherChild in ROOT_NODE.children:
-                if child.nodeId != otherChild.nodeId:
-                    continue
-                dist = nodeDistance(child, otherChild)
-                if dist < bestValue:
-                    bestMatch = (child, otherChild)
-                    bestValue = dist
-
-        mergeNodes(bestMatch[0], bestMatch[1])
-
-
-    print(createNewick(ROOT_NODE))

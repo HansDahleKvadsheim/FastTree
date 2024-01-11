@@ -68,6 +68,32 @@ class TestFasttreeMethods(unittest.TestCase):
         leaf4.parent = innerNode2
         self.assertEqual(0.5, main.nodeDistance(innerNode1, innerNode2))
 
+    def testComputeTotalProfile(self):
+        innerProfile = [
+            {'A': 0.5, 'C': 0, 'G': 0, 'T': 0.5},
+            {'A': 1, 'C': 0, 'G': 0, 'T': 0},
+            {'A': 0, 'C': 0.5, 'G': 0.5, 'T': 0},
+            {'A': 0, 'C': 0, 'G': 1, 'T': 0}
+        ]
+        root = main.Node(nodeId=0, parent=None, profile=None)
+        innerNode = main.Node(nodeId=1, parent=root, profile=innerProfile)
+        leaf1 = main.Node(nodeId=2, parent=innerNode, profile=main.initializeProfile('AACG', 4, 'ACGT'))
+        leaf2 = main.Node(nodeId=3, parent=innerNode, profile=main.initializeProfile('TAGG', 4, 'ACGT'))
+        leaf1.active = False
+        leaf2.active = False
+        innerNode.children = [leaf1, leaf2]
+        leaf3 = main.Node(nodeId=4, parent=root, profile=main.initializeProfile('TAAC', 4, 'ACGT'))
+        leaf4 = main.Node(nodeId=5, parent=root, profile=main.initializeProfile('CACA', 4, 'ACGT'))
+        root.children = [innerNode, leaf3, leaf4]
+
+        expectedProfile = [
+            {'A': 0.5/3, 'C': 1/3, 'G': 0, 'T': 0.5},
+            {'A': 1, 'C': 0, 'G': 0, 'T': 0},
+            {'A': 1/3, 'C': 0.5, 'G': 0.5/3, 'T': 0},
+            {'A': 1/3, 'C': 1/3, 'G': 1/3, 'T': 0}
+        ]
+        self.assertEqual(expectedProfile, main.computeTotalProfile(root))
+
 
 if __name__ == '__main__':
     unittest.main()
