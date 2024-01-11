@@ -25,7 +25,7 @@ class TestFasttreeMethods(unittest.TestCase):
         profile2 = main.initializeProfile('AGTCAT', 6, 'ACGT')
         self.assertEqual(4/6, main.profileDistance(profile1, profile2))
 
-    def testComputeUpDistanceForLeafNode(self):
+    def testComputeUpDistance(self):
         innerNode = main.Node(nodeId=0, parent=None, profile=None)
         leafNode = main.Node(nodeId=1, parent=innerNode, profile=main.initializeProfile('ACGT', 4, 'ACGT'))
         leafNode2 = main.Node(nodeId=2, parent=innerNode, profile=main.initializeProfile('ATAT', 4, 'ACGT'))
@@ -77,7 +77,6 @@ class TestFasttreeMethods(unittest.TestCase):
         nodes = [seed, leaf1, leaf2, leaf3]
         top_hits = seed.initialize_top_hits(nodes, m)
         self.assertEqual(4, len(top_hits))
-        
 
     def testSeedTopHits(self):
         seed = main.Node(nodeId=0, parent=None, profile=main.initializeProfile('ACGT', 4, 'ACGT'))
@@ -93,7 +92,6 @@ class TestFasttreeMethods(unittest.TestCase):
         
         self.assertNotEqual(seed, seed.topHits[0][0])
         self.assertEqual(leaf1, seed.topHits[0][0])
-
 
     def testTopHitsApproximation(self):
         seed = main.Node(nodeId=0, parent=None, profile=main.initializeProfile('ACGT', 4, 'ACGT'))
@@ -128,6 +126,51 @@ class TestFasttreeMethods(unittest.TestCase):
         for leaf in nodes:
             self.assertEqual(2, len(leaf.topHits))
         
+    def testComputeTotalProfile(self):
+        innerProfile = [
+            {'A': 0.5, 'C': 0, 'G': 0, 'T': 0.5},
+            {'A': 1, 'C': 0, 'G': 0, 'T': 0},
+            {'A': 0, 'C': 0.5, 'G': 0.5, 'T': 0},
+            {'A': 0, 'C': 0, 'G': 1, 'T': 0}
+        ]
+        root = main.Node(nodeId=0, parent=None, profile=None)
+        innerNode = main.Node(nodeId=1, parent=root, profile=innerProfile)
+        leaf1 = main.Node(nodeId=2, parent=innerNode, profile=main.initializeProfile('AACG', 4, 'ACGT'))
+        leaf2 = main.Node(nodeId=3, parent=innerNode, profile=main.initializeProfile('TAGG', 4, 'ACGT'))
+        leaf1.active = False
+        leaf2.active = False
+        innerNode.children = [leaf1, leaf2]
+        leaf3 = main.Node(nodeId=4, parent=root, profile=main.initializeProfile('TAAC', 4, 'ACGT'))
+        leaf4 = main.Node(nodeId=5, parent=root, profile=main.initializeProfile('CACA', 4, 'ACGT'))
+        root.children = [innerNode, leaf3, leaf4]
+
+        expectedProfile = [
+            {'A': 0.5/3, 'C': 1/3, 'G': 0, 'T': 0.5},
+            {'A': 1, 'C': 0, 'G': 0, 'T': 0},
+            {'A': 1/3, 'C': 0.5, 'G': 0.5/3, 'T': 0},
+            {'A': 1/3, 'C': 1/3, 'G': 1/3, 'T': 0}
+        ]
+        self.assertEqual(expectedProfile, main.computeTotalProfile(root.children))
+
+    def testUpdateTotalProfile(self):
+        totalProfile = [
+            {'A': 0.5, 'C': 0, 'G': 0, 'T': 0.5},
+            {'A': 1, 'C': 0, 'G': 0, 'T': 0},
+            {'A': 0, 'C': 0.5, 'G': 0, 'T': 0.5},
+            {'A': 0, 'C': 0, 'G': 0, 'T': 1}
+        ]
+        newProfile = main.initializeProfile('ACGT', 4, 'ACGT')
+        expectedProfile = [
+            {'A': 2/3, 'C': 0.0, 'G': 0.0, 'T': 1/3},
+            {'A': 2/3, 'C': 1/3, 'G': 0.0, 'T': 0.0},
+            {'A': 0.0, 'C': 1/3, 'G': 1/3, 'T': 1/3},
+            {'A': 0.0, 'C': 0.0, 'G': 0.0, 'T': 1.0}
+        ]
+        totalProfile = main.updateTotalProfile(3, newProfile, totalProfile)
+        for i in range(4):
+            for c in 'ACGT':
+                self.assertAlmostEqual(expectedProfile[i][c], totalProfile[i][c])
+
 
 if __name__ == '__main__':
     unittest.main()
