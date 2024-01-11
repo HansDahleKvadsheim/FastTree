@@ -34,7 +34,7 @@ class Node:
         # Sort based on score
         top_hits.sort(key=lambda x: x[1])
         self.topHits = top_hits[:m].copy()
-        return top_hits
+        return [(self, 0)] + top_hits[:m]
     
     def approximate_top_hits(self, seed_top_hits, m):
         top_hits = []
