@@ -1,6 +1,7 @@
 # Neighbour joining with profiles
 # Nearest neighbour interchange
 # Top hits heuristic
+import copy
 import random
 import math
 
@@ -52,6 +53,7 @@ DATA_FILE = 'test-small.aln'
 GENOME_LENGTH = 0
 MAX_ID = 0
 m = 0
+TOTAL_PROFILE = None
 ROOT_NODE = None
 
 # ======================= Util functions ====================================
@@ -86,20 +88,28 @@ def initializeProfile(genome: str, length: int, alphabet: str = ALPHABET) -> pro
 
     return [{base: float(genome[i] == base) for base in alphabet} for i in range(len(genome))]
 
-def computeTotalProfile(startNode: Node = ROOT_NODE) -> profile:
-    genomeLength = len(startNode.children[0].profile)
-    alphabet = startNode.children[0].profile[0].keys()
+def computeTotalProfile(nodes: list[Node]) -> profile:
+    genomeLength = len(nodes[0].profile)
+    alphabet = nodes[0].profile[0].keys()
     totalProfile = initializeProfile('', genomeLength, alphabet)
 
-    for child in startNode.children:
+    for child in nodes:
         for i in range(genomeLength):
             for key in child.profile[i].keys():
                 totalProfile[i][key] += child.profile[i][key]
 
     for i in range(genomeLength):
         for key in totalProfile[i]:
-            totalProfile[i][key] = totalProfile[i][key] / len(startNode.children)
+            totalProfile[i][key] = totalProfile[i][key] / len(nodes)
 
+    return totalProfile
+
+def updateTotalProfile(amountOfTerms: int, newProfile: profile, totalProfile: profile = TOTAL_PROFILE) -> profile:
+    genomeLength = len(newProfile)
+
+    for i in range(genomeLength):
+        for key in totalProfile[i]:
+            totalProfile[i][key] = totalProfile[i][key] + (newProfile[i][key] - totalProfile[i][key]) / amountOfTerms
     return totalProfile
 
 def mergeProfiles(profile1: profile, profile2: profile):
@@ -129,6 +139,7 @@ def upDistance(node: Node) -> float:
 
     return profileDistance(node.children[0].profile, node.children[1].profile) / 2
 
+# TODO, implement this correctly
 def mergeNodes(node1: Node, node2: Node):
     global MAX_ID
     # Merge nodes and add them to root
@@ -142,26 +153,6 @@ def mergeNodes(node1: Node, node2: Node):
     node1.active = False
     node2.active = False
     MAX_ID += 1
-
-    global TOTAL_PROFILE
-    for i in range(GENOME_LENGTH):
-        for letter in ALPHABET:
-            TOTAL_PROFILE[i][letter] = ((MAX_ID - 1) * TOTAL_PROFILE[i][letter] + newNode.profile[i][letter]) / MAX_ID
-
-    # Update the best hits
-    for child in ROOT_NODE.children:
-        if child.nodeId == newNode.nodeId:
-            continue
-        distance = nodeDistance(child, newNode)
-        if distance < newNode.bestHitDistance:
-            newNode.bestHit = child
-        if distance < child.bestHitDistance:
-            child.bestHit = newNode
-            child.bestHitDistance = distance
-        if not child.bestHit.active:
-            child.bestHit = child.findActiveAncestor()
-            child.bestHitDistance = distance
-
 
 def outDistance(node: Node) -> float:
     if node.children:
@@ -187,7 +178,7 @@ if __name__ == '__main__':
 
     #create initial top Hits
     seedSequences = (ROOT_NODE.children).copy()
-    m = math.ceil(len(data) ** 0.5) 
+    m = math.ceil(len(data) ** 0.5)
     while seedSequences:
         seed = random.choice(seedSequences)
         seedSequences.remove(seed)
