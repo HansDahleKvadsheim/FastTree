@@ -107,6 +107,7 @@ class TestFasttreeMethods(unittest.TestCase):
         leaf1.approximate_top_hits(top_hits, m)
 
         self.assertEqual(seed, leaf1.topHits[0][0])
+        self.assertEqual(leaf2, leaf1.topHits[1][0])
         
 
 if __name__ == '__main__':
