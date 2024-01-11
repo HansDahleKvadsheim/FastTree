@@ -88,18 +88,21 @@ def computeTotalProfile() -> profile:
     return newProfile
 
 def mergeProfiles(profile1: profile, profile2: profile):
-    return [{base: (profile1[i][base] + profile2[i][base]) / 2 for base in ALPHABET} for i in range(GENOME_LENGTH)]
+    genomeLength = len(profile1)
+    alphabet = profile1[0].keys()
+    return [{base: (profile1[i][base] + profile2[i][base]) / 2 for base in alphabet} for i in range(genomeLength)]
 
 def profileDistance(i: profile, j: profile) -> float:
     total = 0
+    genomeLength = len(i)
     # Go over every position
-    for l in range(GENOME_LENGTH):
+    for l in range(genomeLength):
         # Calculate the distance between all possible combinations
         for key in i[l].keys():
             for otherKey in j[l].keys():
                 total += i[l][key] * j[l][otherKey] * int(key != otherKey)
 
-    return total / GENOME_LENGTH
+    return total / genomeLength
 
 def nodeDistance(node1: Node, node2: Node) -> float:
     return profileDistance(node1.profile, node2.profile) - upDistance(node1) - upDistance(node2)
