@@ -1,7 +1,5 @@
 import unittest
-
 import main
-
 
 class TestFasttreeMethods(unittest.TestCase):
 
@@ -47,6 +45,18 @@ class TestFasttreeMethods(unittest.TestCase):
             {'A': 0, 'C': 1, 'G': 0, 'T': 0}
         ]
         self.assertEqual(targetProfile, main.mergeProfiles(profile1, profile2))
+
+    def testNodeDistance(self):
+        leaf1 = main.Node(nodeId=0, parent=None, profile=main.initializeProfile('ACGT', 4, 'ACGT'))
+        leaf2 = main.Node(nodeId=1, parent=None, profile=main.initializeProfile('ACGA', 4, 'ACGT'))
+        self.assertEqual(0.25, main.nodeDistance(leaf1, leaf2))
+
+        innerNode1 = main.Node(nodeId=2, parent=None, profile=main.mergeProfiles(leaf1.profile, leaf2.profile))
+        innerNode1.children = [leaf1, leaf2]
+        leaf1.parent = innerNode1
+        leaf2.parent = innerNode1
+        leaf3 = main.Node(nodeId=3, parent=None, profile=main.initializeProfile('AGCG', 4, 'ACGT'))
+        self.assertEqual(0.625, main.nodeDistance(innerNode1, leaf3))
 
 
 if __name__ == '__main__':
