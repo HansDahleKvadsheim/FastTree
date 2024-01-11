@@ -76,7 +76,7 @@ class TestFasttreeMethods(unittest.TestCase):
         m = 2
         nodes = [seed, leaf1, leaf2, leaf3]
         top_hits = seed.initialize_top_hits(nodes, m)
-        self.assertEqual(3, len(top_hits))
+        self.assertEqual(4, len(top_hits))
         
 
     def testSeedTopHits(self):
@@ -87,9 +87,13 @@ class TestFasttreeMethods(unittest.TestCase):
         m = 2
         nodes = [seed, leaf1, leaf2, leaf3]
         top_hits = seed.initialize_top_hits(nodes, m)
-        self.assertEqual(leaf1, top_hits[0][0])
-        self.assertEqual(leaf2, top_hits[1][0])
-        self.assertEqual(leaf3, top_hits[2][0])
+        self.assertEqual(seed, top_hits[0][0])
+        self.assertEqual(leaf1, top_hits[1][0])
+        self.assertEqual(leaf2, top_hits[2][0])
+        
+        self.assertNotEqual(seed, seed.topHits[0][0])
+        self.assertEqual(leaf1, seed.topHits[0][0])
+
 
     def testTopHitsApproximation(self):
         seed = main.Node(nodeId=0, parent=None, profile=main.initializeProfile('ACGT', 4, 'ACGT'))
@@ -97,17 +101,32 @@ class TestFasttreeMethods(unittest.TestCase):
         leaf2 = main.Node(nodeId=1, parent=None, profile=main.initializeProfile('AGGT', 4, 'ACGT'))
         leaf3 = main.Node(nodeId=3, parent=None, profile=main.initializeProfile('CGGT', 4, 'ACGT'))
         leaf4 = main.Node(nodeId=3, parent=None, profile=main.initializeProfile('AAAT', 4, 'ACGT'))
-        leaf5 = main.Node(nodeId=3, parent=None, profile=main.initializeProfile('AAAG', 4, 'ACGT'))
-        leaf6 = main.Node(nodeId=3, parent=None, profile=main.initializeProfile('AAAC', 4, 'ACGT'))
-        leaf7 = main.Node(nodeId=3, parent=None, profile=main.initializeProfile('AACC', 4, 'ACGT'))
-        leaf8 = main.Node(nodeId=3, parent=None, profile=main.initializeProfile('GAAA', 4, 'ACGT'))
-        m = 3
-        nodes = [seed, leaf1, leaf2, leaf3, leaf4, leaf5, leaf6, leaf7, leaf8]
+        m = 2
+        nodes = [seed, leaf1, leaf2, leaf3, leaf4]
         top_hits = seed.initialize_top_hits(nodes, m)
         leaf1.approximate_top_hits(top_hits, m)
 
         self.assertEqual(seed, leaf1.topHits[0][0])
         self.assertEqual(leaf2, leaf1.topHits[1][0])
+
+    def testInitializeTopHits(self):
+        root_node = main.Node(-1, None, main.initializeProfile('', 4, 'ACGT'))
+        leaf1 = main.Node(nodeId=0, parent=None, profile=main.initializeProfile('AAAA', 4, 'ACGT'))
+        leaf2 = main.Node(nodeId=1, parent=None, profile=main.initializeProfile('AATC', 4, 'ACGT'))
+        leaf3 = main.Node(nodeId=3, parent=None, profile=main.initializeProfile('AACG', 4, 'ACGT'))
+        leaf4 = main.Node(nodeId=3, parent=None, profile=main.initializeProfile('AAGT', 4, 'ACGT'))
+        leaf4 = main.Node(nodeId=3, parent=None, profile=main.initializeProfile('ACTA', 4, 'ACGT'))
+        nodes = [leaf1, leaf2, leaf3, leaf4]
+        root_node.children.append(leaf1)
+        root_node.children.append(leaf2)
+        root_node.children.append(leaf3)
+        root_node.children.append(leaf4)
+        m = 2
+
+        main.initialize_top_hits(m, root_node)
+
+        for leaf in nodes:
+            self.assertEqual(2, len(leaf.topHits))
         
 
 if __name__ == '__main__':

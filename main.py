@@ -34,7 +34,7 @@ class Node:
         # Sort based on score
         top_hits.sort(key=lambda x: x[1])
         self.topHits = top_hits[:m].copy()
-        return top_hits
+        return [(self, 0)] + top_hits
     
     def approximate_top_hits(self, seed_top_hits, m):
         top_hits = []
@@ -183,6 +183,19 @@ def outDistance(node: Node) -> float:
 
     return len(ROOT_NODE.children) * profileDistance(node.profile, TOTAL_PROFILE)
 
+def initialize_top_hits(m: int, root: Node):
+    seedSequences = (root.children).copy()
+    while seedSequences:
+        seed = random.choice(seedSequences)
+        seedSequences.remove(seed)
+        top_hits = seed.initialize_top_hits(root.children, m)
+        for seq, _ in top_hits[:m]:
+            #if topHits is empty and neighbours are close enough.
+            if not seq.topHits and profileDistance(seed.profile, seq.profile)/profileDistance(seed.profile, top_hits[2*m-1][0].profile) < 0.75:
+                #below code never hits. Should be a valid criteria. Might be because of test size. 
+                seq.approximate_top_hits(top_hits, m)
+                seedSequences.remove(seq)
+
 # =============================== Algorithm =======================================
 
 
@@ -200,18 +213,8 @@ if __name__ == '__main__':
     TOTAL_PROFILE = computeTotalProfile()
 
     #create initial top Hits
-    seedSequences = (ROOT_NODE.children).copy()
     m = math.ceil(len(data) ** 0.5) 
-    while seedSequences:
-        seed = random.choice(seedSequences)
-        seedSequences.remove(seed)
-        top_hits = seed.initialize_top_hits(ROOT_NODE.children, m)
-        for seq, score in top_hits[:m]:
-            #if topHits is empty and neighbours are close enough.
-            if not seq.topHits and profileDistance(seed.profile, seq.profile)/profileDistance(seed.profile, top_hits[2*m][0].profile) < 0.75:
-                #below code never hits. Should be a valid criteria. Might be because of test size. 
-                seq.approximate_top_hits(top_hits, m)
-                seedSequences.remove(seq)
+    initialize_top_hits(m, ROOT_NODE)
 
     for seq in ROOT_NODE.children:
         print(seq.topHits)
