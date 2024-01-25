@@ -29,8 +29,6 @@ class TestFasttreeMethods(unittest.TestCase):
         innerNode = main.Node(nodeId=0, parent=None, profile=None)
         leafNode = main.Node(nodeId=1, parent=innerNode, profile=main.initializeProfile('ACGT', 4, 'ACGT'))
         leafNode2 = main.Node(nodeId=2, parent=innerNode, profile=main.initializeProfile('ATAT', 4, 'ACGT'))
-        leafNode.children = []
-        leafNode2.children = []
         innerNode.children = [leafNode, leafNode2]
         self.assertEqual(0, main.upDistance(leafNode))
         self.assertEqual(0.25, main.upDistance(innerNode))
@@ -137,8 +135,6 @@ class TestFasttreeMethods(unittest.TestCase):
         innerNode = main.Node(nodeId=1, parent=root, profile=innerProfile)
         leaf1 = main.Node(nodeId=2, parent=innerNode, profile=main.initializeProfile('AACG', 4, 'ACGT'))
         leaf2 = main.Node(nodeId=3, parent=innerNode, profile=main.initializeProfile('TAGG', 4, 'ACGT'))
-        leaf1.active = False
-        leaf2.active = False
         innerNode.children = [leaf1, leaf2]
         leaf3 = main.Node(nodeId=4, parent=root, profile=main.initializeProfile('TAAC', 4, 'ACGT'))
         leaf4 = main.Node(nodeId=5, parent=root, profile=main.initializeProfile('CACA', 4, 'ACGT'))
@@ -170,7 +166,6 @@ class TestFasttreeMethods(unittest.TestCase):
         for i in range(4):
             for c in 'ACGT':
                 self.assertAlmostEqual(expectedProfile[i][c], totalProfile[i][c])
-
 
 if __name__ == '__main__':
     unittest.main()
