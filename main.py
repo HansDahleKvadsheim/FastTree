@@ -1,6 +1,7 @@
 # Neighbour joining with profiles
 # Nearest neighbour interchange
 # Top hits heuristic
+import queue
 import random
 import math
 
@@ -31,15 +32,15 @@ class Node:
                 "\nchildren: " + ' '.join([str(n) for n in self.children]) +
                 "\ntophits: " + ' '.join([str(n[0]) for n in self.topHits]) + '}')
 
-    def findActiveAncestor(self, nodes: nodeList) -> 'Node':
+    def findActiveAncestor(self, nodes: nodeList) -> int:
         """
         Finds the active ancestor of this node
         :return: The first active ancestor encountered or this node if this node is active
         """
-        currentNode = self.nodeId
+        currentNode = self
         while not currentNode.active:
             currentNode = nodes[currentNode.parent]
-        return currentNode
+        return currentNode.nodeId
 
     def initialize_top_hits(self, nodes: nodeList, active_nodes: list[int], m: int) -> topHitsList:
         """
@@ -207,7 +208,7 @@ def calculateUpDistance(node: Node, nodes: nodeList) -> float:
     node2 = nodes[node.children[1]]
     return profileDistance(node1.profile, node2.profile) / 2
 
-def mergeNodes(node1: Node, node2: Node, m: int) -> Node:
+def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList) -> Node:
     """
     Takes two nodes and combines them according to the fast tree algorithm
     :param node1: First node to merge
@@ -215,22 +216,39 @@ def mergeNodes(node1: Node, node2: Node, m: int) -> Node:
     :return: The newly made node having both param nodes as children
     """
     # Create new node
-    newNode = Node(0, 0, mergeProfiles(node1.profile, node2.profile))
+    newNode = Node(len(nodes), 0, mergeProfiles(node1.profile, node2.profile))
 
     # Add old nodes as children
-    newNode.children = [node1, node2]
-    node1.parent = newNode
-    node2.parent = newNode
+    newNode.children = [node1.nodeId, node2.nodeId]
+    node1.parent = newNode.nodeId
+    node2.parent = newNode.nodeId
 
     # Calculate the updistance
-    newNode.upDistance = calculateUpDistance(newNode)
+    newNode.upDistance = calculateUpDistance(newNode, nodes)
 
-    # Calculate the tophits list
-    node1.topHits.remove(node2)
-    node2.topHits.remove(node1)
-    combinedList = node1.topHits + node2.topHits
+    #Update the age of the newNode
+    newNode.age = 1 + max(node1.age, node2.age)
 
-    newNode.initialize_top_hits()
+    # Remove children nodes from top Hits list
+    #node1.topHits.remove(node2.nodeId)
+    #node2.topHits.remove(node1.nodeId)
+
+    #Combine top Hits list and remove duplicates
+    combinedList = list(dict.fromkeys(node1.topHits + node2.topHits))
+
+    combinedTophits = []
+    for child in combinedList:
+        node = nodes[child[0]]
+        score = profileDistance(node.profile, newNode.profile)
+        combinedTophits.append((child[0], score))
+
+    combinedTophits.sort(key=lambda x: x[1])
+
+    #In case tophits node1 == node2
+    if len(combinedTophits) == len(node1.topHits) and len(combinedTophits) == len(node2.topHits):
+        newNode.topHits = combinedTophits[:m-1]
+    else:
+        newNode.topHits = combinedTophits[:m]
 
     # Set old nodes to inactive
     node1.active = False
@@ -255,8 +273,9 @@ def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int]):
             neighbourNode = nodes[neighbour]
             # If the top hits of the neighbour is still empty
             # Possible add an addition check which also must be true:
-            # profileDistance(seed.profile, neighbour.profile)/profileDistance(seed.profile, top_hits[2*m-1][0].profile) < 0.75
-            if not neighbourNode.topHits:
+            #
+            if (not neighbourNode.topHits and
+                    profileDistance(seedNode.profile, neighbourNode.profile)/profileDistance(seedNode.profile, nodes[top_hits[2*m-1][0]].profile) < 0.50):
                 # The neighbour is a 'close neighbour', so we estimate the top hits for it
                 neighbourNode.approximate_top_hits(top_hits, m, nodes)
                 seedSequences.remove(neighbour)
@@ -300,5 +319,34 @@ if __name__ == '__main__':
     initialize_top_hits(m, nodes, activesNodes)
 
     # Do N - 3 joins
-    while len(activesNodes) >= 3:
-        break
+    while len(activesNodes) > 3:
+        q = queue.PriorityQueue()
+        for i in activesNodes:
+            for topHit in nodes[i].topHits:
+                nodeId1 = nodes[i].findActiveAncestor(nodes)
+                nodeId2 = nodes[topHit[0]].findActiveAncestor(nodes)
+                if nodeId1 != nodeId2:
+                    q.put((topHit[1], nodeId1, nodeId2))    #  (Distance, node from, node to)
+
+        toppesthits = []
+        for _ in range(m):
+            toppesthits.append(q.get())
+
+        bestHit = None
+        bestValue = float('inf')
+        for _, nodeFrom, nodeTo in toppesthits:
+            node1 = nodes[nodeFrom]
+            node2 = nodes[nodeTo]
+            score = nodeDistance(node1, node2)
+            if score < bestValue:
+                bestHit = (node1, node2)
+                bestValue = score
+
+        mergedNode = mergeNodes(bestHit[0], bestHit[1], m, nodes)
+        activesNodes.remove(bestHit[0].nodeId)
+        activesNodes.remove(bestHit[1].nodeId)
+        activesNodes.append(mergedNode.nodeId)
+        nodes[mergedNode.nodeId] = mergedNode
+        print('{}, {}, {}'.format(bestHit[0].nodeId, bestHit[1].nodeId, bestValue))
+
+    a = 1
