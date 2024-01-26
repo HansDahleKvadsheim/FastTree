@@ -53,6 +53,7 @@ class TestFasttreeMethods(unittest.TestCase):
         # Test for leaf node and inner node
         innerNode1 = main.Node(nodeId=2, parent=None, profile=main.mergeProfiles(leaf1.profile, leaf2.profile))
         innerNode1.children = [leaf1, leaf2]
+        innerNode1.upDistance = main.upDistance(innerNode1)
         leaf1.parent = innerNode1
         leaf2.parent = innerNode1
         leaf3 = main.Node(nodeId=3, parent=None, profile=main.initializeProfile('AGCG', 4, 'ACGT'))
@@ -62,6 +63,7 @@ class TestFasttreeMethods(unittest.TestCase):
         leaf4 = main.Node(nodeId=4, parent=None, profile=main.initializeProfile('AGCC', 4, 'ACGT'))
         innerNode2 = main.Node(nodeId=5, parent=None, profile=main.mergeProfiles(leaf3.profile, leaf4.profile))
         innerNode2.children = [leaf3, leaf4]
+        innerNode2.upDistance = main.upDistance(innerNode2)
         leaf3.parent = innerNode2
         leaf4.parent = innerNode2
         self.assertEqual(0.5, main.nodeDistance(innerNode1, innerNode2))

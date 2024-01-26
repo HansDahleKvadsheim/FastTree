@@ -31,6 +31,10 @@ class Node:
                 "\ntophits: " + ' '.join([str(n[0].nodeId) for n in self.topHits]) + '}')
 
     def findActiveAncestor(self) -> 'Node':
+        """
+        Finds the act
+        :return:
+        """
         currentNode = self
         while not currentNode.active:
             currentNode = currentNode.parent
@@ -53,7 +57,7 @@ class Node:
     
     def approximate_top_hits(self, seed_top_hits: list['Node'], m: int) -> None:
         top_hits = []
-        for hit, _ in seed_top_hits[:2*m]:
+        for hit, _ in seed_top_hits[:JOIN_SAFETY_FACTOR * m]:
             if hit is not self:
                 score = profileDistance(self.profile, hit.profile)
                 top_hits.append((hit, score))
@@ -66,10 +70,9 @@ class Node:
 ALPHABET = 'ACGT'
 DATA_FILE = 'test-small.aln'
 ROOT_ID = -1
+JOIN_SAFETY_FACTOR = 2
 # Non-constants
-GENOME_LENGTH = 0
 MAX_ID = 0
-TOTAL_PROFILE = None
 
 # ======================= Util functions ====================================
 def readFile(fileName: str) -> list[str]:
@@ -128,7 +131,7 @@ def computeTotalProfile(nodes: list[Node]) -> profile:
 
     return totalProfile
 
-def updateTotalProfile(amountOfTerms: int, newProfile: profile, totalProfile: profile = TOTAL_PROFILE) -> profile:
+def updateTotalProfile(amountOfTerms: int, newProfile: profile, totalProfile: profile) -> profile:
     """
     Updates the total profile with the new profile
     :param amountOfTerms: The amount of profiles which have been used to compute the total so far
@@ -167,7 +170,14 @@ def profileDistance(i: profile, j: profile) -> float:
     return total / genomeLength
 
 def nodeDistance(node1: Node, node2: Node) -> float:
-    return profileDistance(node1.profile, node2.profile) - upDistance(node1) - upDistance(node2)
+    """
+    Calculates the distance between two nodes
+    :param node1: The first node
+    :param node2: The second node
+    :return: The distance
+    """
+    # d_u(i, j) = P(i, j) - u_1 - u_2
+    return profileDistance(node1.profile, node2.profile) - node1.upDistance - node2.upDistance
 
 def upDistance(node: Node) -> float:
     """
@@ -175,11 +185,11 @@ def upDistance(node: Node) -> float:
     :param node: The node to calculate the updistance for
     :return: The updistance for the node
     """
-
     # Leafs are by definition 0
     if not node.children:
         return 0
 
+    # u(ij) = P(i, j) / 2
     return profileDistance(node.children[0].profile, node.children[1].profile) / 2
 
 def mergeNodes(node1: Node, node2: Node, m: int) -> Node:
@@ -203,7 +213,6 @@ def mergeNodes(node1: Node, node2: Node, m: int) -> Node:
     # Calculate the tophits list
     node1.topHits.remove(node2)
     node2.topHits.remove(node1)
-    combinedList = node1.topHits
     combinedList = node1.topHits + node2.topHits
 
     newNode.initialize_top_hits()
@@ -214,7 +223,7 @@ def mergeNodes(node1: Node, node2: Node, m: int) -> Node:
 
     return newNode
 
-def outDistance(node: Node, totalProfile: profile = TOTAL_PROFILE) -> float:
+def outDistance(node: Node, totalProfile: profile) -> float:
     if not node.children:
         return len(root_node.children) * profileDistance(node.profile, totalProfile)
 
@@ -238,12 +247,13 @@ def initialize_top_hits(m: int, root: Node):
             # Possible add an addition check which also must be true:
             # profileDistance(seed.profile, neighbour.profile)/profileDistance(seed.profile, top_hits[2*m-1][0].profile) < 0.75
             if not neighbour.topHits:
+                # The neighbour is a 'close neighbour', so we estimate the top hits for it
                 neighbour.approximate_top_hits(top_hits, m)
                 seedSequences.remove(neighbour)
 
 def findBestJoin(topHits: topHitsList):
     bestCandidate = None
-    bestCriterion = 1.0
+    bestCriterion = float("inf")
     for hit in topHits:
         node = hit[1].findActiveAncestor()
         node.age += 1
@@ -261,17 +271,19 @@ def findBestJoin(topHits: topHitsList):
 
 if __name__ == '__main__':
     data = readFile(DATA_FILE)
-    GENOME_LENGTH = len(data[0])
+    genomeLength = len(data[0])
     amountOfGenomes = len(data)
 
     # Create initial star topology
-    root_node = Node(ROOT_ID, None, initializeProfile('', GENOME_LENGTH, ALPHABET))
+    root_node = Node(ROOT_ID, None, initializeProfile('', genomeLength, ALPHABET))
     for genome in data:
-        root_node.children.append(Node(MAX_ID, root_node, initializeProfile(genome, GENOME_LENGTH, ALPHABET)))
+        root_node.children.append(Node(MAX_ID, root_node, initializeProfile(genome, genomeLength, ALPHABET)))
         MAX_ID += 1
 
+    root = root_node.findActiveAncestor()
+
     # Create total profile
-    TOTAL_PROFILE = computeTotalProfile(root_node.children)
+    totalProfile = computeTotalProfile(root_node.children)
 
     # create initial top Hits
     m = math.ceil(amountOfGenomes ** 0.5)
@@ -295,6 +307,7 @@ if __name__ == '__main__':
         pass
         # print(bestJoin)
 
+    # Do N - 3 joins
     while len(root_node.children) >= 3:
         bestJoin = findBestJoin(bestJoins)
         break
