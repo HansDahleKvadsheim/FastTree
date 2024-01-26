@@ -328,10 +328,12 @@ if __name__ == '__main__':
                 if nodeId1 != nodeId2:
                     q.put((topHit[1], nodeId1, nodeId2))    #  (Distance, node from, node to)
 
+        # Get the best m hits over all nodes
         toppesthits = []
         for _ in range(m):
             toppesthits.append(q.get())
 
+        # Compute the score for all best hits and take the best one
         bestHit = None
         bestValue = float('inf')
         for _, nodeFrom, nodeTo in toppesthits:
@@ -342,11 +344,9 @@ if __name__ == '__main__':
                 bestHit = (node1, node2)
                 bestValue = score
 
+        # Merge the nodes
         mergedNode = mergeNodes(bestHit[0], bestHit[1], m, nodes)
         activesNodes.remove(bestHit[0].nodeId)
         activesNodes.remove(bestHit[1].nodeId)
         activesNodes.append(mergedNode.nodeId)
         nodes[mergedNode.nodeId] = mergedNode
-        print('{}, {}, {}'.format(bestHit[0].nodeId, bestHit[1].nodeId, bestValue))
-
-    a = 1
