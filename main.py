@@ -1,19 +1,20 @@
 # Neighbour joining with profiles
 # Nearest neighbour interchange
 # Top hits heuristic
-import copy
-import queue
 import random
 import math
 
 # Typehints
 profile = list[dict[str, float]]
-topHitsList = list[tuple['Node', float]]
+topHitsList = list[tuple[int, float]]
+nodeList = dict[int, 'Node']
 
 class Node:
-    def __init__(self, nodeId: int, parent: 'Node' = None, profile: profile = None):
+    def __init__(self, nodeId: int, parent: int, profile: profile = None, children=None):
+        if children is None:
+            children = []
         self.nodeId = nodeId
-        self.children = []
+        self.children = children
         self.parent = parent
         self.profile = profile
         self.upDistance = 0
@@ -26,41 +27,52 @@ class Node:
 
     def __repr__(self):
         return ("{id: " + str(self.nodeId) +
-                " parent: " + str(self.parent.nodeId) +
-                "\nchildren: " + ' '.join([str(n.nodeId) for n in self.children]) +
-                "\ntophits: " + ' '.join([str(n[0].nodeId) for n in self.topHits]) + '}')
+                " parent: " + str(self.parent) +
+                "\nchildren: " + ' '.join([str(n) for n in self.children]) +
+                "\ntophits: " + ' '.join([str(n[0]) for n in self.topHits]) + '}')
 
-    def findActiveAncestor(self) -> 'Node':
+    def findActiveAncestor(self, nodes: nodeList) -> 'Node':
         """
-        Finds the act
-        :return:
+        Finds the active ancestor of this node
+        :return: The first active ancestor encountered or this node if this node is active
         """
-        currentNode = self
+        currentNode = self.nodeId
         while not currentNode.active:
-            currentNode = currentNode.parent
+            currentNode = nodes[currentNode.parent]
         return currentNode
 
-    def initialize_top_hits(self, active_nodes: list['Node'], m: int) -> topHitsList:
+    def initialize_top_hits(self, nodes: nodeList, active_nodes: list[int], m: int) -> topHitsList:
+        """
+        Initializes the top hits list for this node
+        :param nodes:   The list of all nodes
+        :param active_nodes:    The list of current active nodes
+        :param m:   m
+        :return: The list of top hits for this node
+        """
         # Keep a list of top hits for this sequence
         top_hits = []
 
-
-        for seq in active_nodes:
-            if seq is not self:
-                score = profileDistance(self.profile, seq.profile)
-                top_hits.append((seq, score))
+        for nodeId in active_nodes:
+            if nodeId == self.nodeId:
+                continue
+            seq = nodes[nodeId]
+            score = profileDistance(self.profile, seq.profile)
+            top_hits.append((nodeId, score))
 
         # Sort based on score
         top_hits.sort(key=lambda x: x[1])
-        self.topHits = top_hits[:m].copy()
-        return [(self, 0)] + top_hits
+        self.topHits = top_hits[:m]
+        return [(self.nodeId, 0)] + top_hits
     
-    def approximate_top_hits(self, seed_top_hits: list['Node'], m: int) -> None:
+    def approximate_top_hits(self, seed_top_hits: topHitsList, m: int, nodes: nodeList) -> None:
         top_hits = []
         for hit, _ in seed_top_hits[:JOIN_SAFETY_FACTOR * m]:
-            if hit is not self:
-                score = profileDistance(self.profile, hit.profile)
-                top_hits.append((hit, score))
+            if hit == self.nodeId:
+                continue
+            hitNode = nodes[hit]
+            score = profileDistance(self.profile, hitNode.profile)
+            top_hits.append((hit, score))
+
         top_hits.sort(key=lambda x: x[1])
         self.topHits = top_hits[:m]
 
@@ -69,10 +81,8 @@ class Node:
 # Constants
 ALPHABET = 'ACGT'
 DATA_FILE = 'test-small.aln'
-ROOT_ID = -1
 JOIN_SAFETY_FACTOR = 2
-# Non-constants
-MAX_ID = 0
+ROOT_NODE_ID = 0
 
 # ======================= Util functions ====================================
 def readFile(fileName: str) -> list[str]:
@@ -110,24 +120,26 @@ def initializeProfile(genome: str, length: int, alphabet: str = ALPHABET) -> pro
 
     return [{base: float(genome[i] == base) for base in alphabet} for i in range(len(genome))]
 
-def computeTotalProfile(nodes: list[Node]) -> profile:
+def computeTotalProfile(nodes: dict[int: Node]) -> profile:
     """
     Compute the total profile using the profiles from certain nodes
     :param nodes: The nodes to use to compute the total profile
     :return: The total profile
     """
-    genomeLength = len(nodes[0].profile)
-    alphabet = nodes[0].profile[0].keys()
+    genomeLength = len(nodes[ROOT_NODE_ID].profile)
+    alphabet = nodes[ROOT_NODE_ID].profile[0].keys()
     totalProfile = initializeProfile('', genomeLength, alphabet)
+    activeNodes = nodes[ROOT_NODE_ID].children
 
-    for child in nodes:
+    for nodeId in activeNodes:
+        child = nodes[nodeId]
         for i in range(genomeLength):
             for key in child.profile[i].keys():
                 totalProfile[i][key] += child.profile[i][key]
 
     for i in range(genomeLength):
         for key in totalProfile[i]:
-            totalProfile[i][key] = totalProfile[i][key] / len(nodes)
+            totalProfile[i][key] = totalProfile[i][key] / len(activeNodes)
 
     return totalProfile
 
@@ -179,10 +191,11 @@ def nodeDistance(node1: Node, node2: Node) -> float:
     # d_u(i, j) = P(i, j) - u_1 - u_2
     return profileDistance(node1.profile, node2.profile) - node1.upDistance - node2.upDistance
 
-def upDistance(node: Node) -> float:
+def calculateUpDistance(node: Node, nodes: nodeList) -> float:
     """
     Calculates the updistance for a given node
     :param node: The node to calculate the updistance for
+    :param nodes: The list of all nodes
     :return: The updistance for the node
     """
     # Leafs are by definition 0
@@ -190,7 +203,9 @@ def upDistance(node: Node) -> float:
         return 0
 
     # u(ij) = P(i, j) / 2
-    return profileDistance(node.children[0].profile, node.children[1].profile) / 2
+    node1 = nodes[node.children[0]]
+    node2 = nodes[node.children[1]]
+    return profileDistance(node1.profile, node2.profile) / 2
 
 def mergeNodes(node1: Node, node2: Node, m: int) -> Node:
     """
@@ -200,7 +215,7 @@ def mergeNodes(node1: Node, node2: Node, m: int) -> Node:
     :return: The newly made node having both param nodes as children
     """
     # Create new node
-    newNode = Node(0, None, mergeProfiles(node1.profile, node2.profile))
+    newNode = Node(0, 0, mergeProfiles(node1.profile, node2.profile))
 
     # Add old nodes as children
     newNode.children = [node1, node2]
@@ -208,7 +223,7 @@ def mergeNodes(node1: Node, node2: Node, m: int) -> Node:
     node2.parent = newNode
 
     # Calculate the updistance
-    newNode.upDistance = upDistance(newNode)
+    newNode.upDistance = calculateUpDistance(newNode)
 
     # Calculate the tophits list
     node1.topHits.remove(node2)
@@ -223,32 +238,27 @@ def mergeNodes(node1: Node, node2: Node, m: int) -> Node:
 
     return newNode
 
-def outDistance(node: Node, totalProfile: profile) -> float:
-    if not node.children:
-        return len(root_node.children) * profileDistance(node.profile, totalProfile)
+def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int]):
+    seedSequences = nodes[ROOT_NODE_ID].children
 
-    return len(root_node.children) * profileDistance(node.profile, totalProfile) - profileDistance(node.children[0].profile, node.children[1].profile)
-
-
-def initialize_top_hits(m: int, root: Node):
-    seedSequences = copy.copy(root.children)
-    while seedSequences:
+    while seedSequences != []:
         # Take an arbitrary seed sequence
         seed = random.choice(seedSequences)
         seedSequences.remove(seed)
+        seedNode = nodes[seed]
 
         # Generate a top hits list for that sequence by comparing it with the neighbour joining criterion
-        top_hits = seed.initialize_top_hits(root.children, m)
+        top_hits = seedNode.initialize_top_hits(nodes, activeNodes, m)
 
         # For each neighbour in the top m hits (the closest m neighbours)
         for neighbour, _ in top_hits[:m]:
-
+            neighbourNode = nodes[neighbour]
             # If the top hits of the neighbour is still empty
             # Possible add an addition check which also must be true:
             # profileDistance(seed.profile, neighbour.profile)/profileDistance(seed.profile, top_hits[2*m-1][0].profile) < 0.75
-            if not neighbour.topHits:
+            if not neighbourNode.topHits:
                 # The neighbour is a 'close neighbour', so we estimate the top hits for it
-                neighbour.approximate_top_hits(top_hits, m)
+                neighbourNode.approximate_top_hits(top_hits, m, nodes)
                 seedSequences.remove(neighbour)
 
 def findBestJoin(topHits: topHitsList):
@@ -265,7 +275,6 @@ def findBestJoin(topHits: topHitsList):
     return bestCandidate
 
 
-
 # =============================== Algorithm =======================================
 
 
@@ -275,39 +284,21 @@ if __name__ == '__main__':
     amountOfGenomes = len(data)
 
     # Create initial star topology
-    root_node = Node(ROOT_ID, None, initializeProfile('', genomeLength, ALPHABET))
+    nodes = {0: Node(0, -1, initializeProfile('', genomeLength, ALPHABET))}
+    activesNodes = []
     for genome in data:
-        root_node.children.append(Node(MAX_ID, root_node, initializeProfile(genome, genomeLength, ALPHABET)))
-        MAX_ID += 1
-
-    root = root_node.findActiveAncestor()
+        newNode = Node(len(nodes), 0, initializeProfile(genome, genomeLength, ALPHABET))
+        nodes[0].children.append(newNode.nodeId)
+        nodes[newNode.nodeId] = newNode
+        activesNodes.append(newNode.nodeId)
 
     # Create total profile
-    totalProfile = computeTotalProfile(root_node.children)
+    totalProfile = computeTotalProfile(nodes)
 
     # create initial top Hits
     m = math.ceil(amountOfGenomes ** 0.5)
-    initialize_top_hits(m, root_node)
-
-    for seq in root_node.children:
-        print(str(seq.nodeId) + ' ', end='')
-        for topHit in seq.topHits:
-            print('(' + str(topHit[0].nodeId) + " " + str(topHit[1]) + ')', end="")
-        print()
-
-    # Get the top m joins
-    q = queue.PriorityQueue()
-    for seq in root_node.children:
-        for topHit in seq.topHits:
-            q.put((topHit[1], seq, topHit[0]))  # (Distance, Seed node, neighbour node)
-
-    bestJoins = [q.get() for _ in range(m)]
-
-    for bestJoin in bestJoins:
-        pass
-        # print(bestJoin)
+    initialize_top_hits(m, nodes, activesNodes)
 
     # Do N - 3 joins
-    while len(root_node.children) >= 3:
-        bestJoin = findBestJoin(bestJoins)
+    while len(activesNodes) >= 3:
         break
