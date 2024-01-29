@@ -293,6 +293,59 @@ def findBestJoin(topHits: topHitsList):
 
     return bestCandidate
 
+def log_corrected_distance(profile1, profile2):
+    # Implement the log-corrected distance calculation between two profiles
+    # This is a simplified placeholder; you'll need to implement the actual calculation
+    return math.log(1 + profileDistance(profile1, profile2))
+
+
+def perform_nni(node: Node, nodes: nodeList) -> None:
+    """
+    Performs the nearest neighbor interchange on a given node.
+    :param node: The node to perform NNI on.
+    :param nodes: The list of all nodes.
+    """
+   # Extract subtrees or leaf nodes
+    A, B = nodes[node.children[0]], nodes[node.children[1]]
+    if len(A.children) == 2 and len(B.children) == 2:
+        C, D = nodes[A.children[0]], nodes[A.children[1]]
+        E, F = nodes[B.children[0]], nodes[B.children[1]]
+
+        # Calculate distances for current and alternate topologies
+        current_distance = log_corrected_distance(C.profile, D.profile) + log_corrected_distance(E.profile, F.profile)
+        alt_distance_1 = log_corrected_distance(C.profile, E.profile) + log_corrected_distance(D.profile, F.profile)
+        alt_distance_2 = log_corrected_distance(D.profile, E.profile) + log_corrected_distance(C.profile, E.profile)
+
+        # Determine if an alternate topology has a lower distance
+        if min(alt_distance_1, alt_distance_2) < current_distance:
+            if alt_distance_1 < alt_distance_2:
+                # Perform swap for the first alternate topology
+                A.children = [C.nodeId, E.nodeId]
+                B.children = [D.nodeId, F.nodeId]
+            else:
+                # Perform swap for the second alternate topology
+                A.children = [D.nodeId, E.nodeId]
+                B.children = [C.nodeId, F.nodeId]
+
+            # Recompute profiles for affected nodes
+            A.profile = mergeProfiles(nodes[A.children[0]].profile, nodes[A.children[1]].profile)  
+            B.profile = mergeProfiles(nodes[B.children[0]].profile, nodes[B.children[1]].profile)  
+
+
+def perform_nni_rounds(nodes: nodeList, rounds: int) -> None:
+    """
+    Applies NNI to all applicable nodes in the tree.
+    :param nodes: The list of all nodes.
+    :param activeNodes: The list of active nodes.
+    """
+    for _ in range(rounds):
+        for node_id, node in nodes.items():
+            if len(node.children) == 2:  # Ensure it's an internal node with two children
+                perform_nni(node, nodes)
+
+
+
+
 
 # =============================== Algorithm =======================================
 
@@ -350,3 +403,5 @@ if __name__ == '__main__':
         activesNodes.remove(bestHit[1].nodeId)
         activesNodes.append(mergedNode.nodeId)
         nodes[mergedNode.nodeId] = mergedNode
+        
+

@@ -180,6 +180,73 @@ class TestFasttreeMethods(unittest.TestCase):
             for c in 'ACGT':
                 self.assertAlmostEqual(expectedProfile[i][c], totalProfile[i][c])
 
+class TestNNIFunctions(unittest.TestCase):
+
+    def setUp(self):
+        # This method will run before each test
+        # Initialize common structures or nodes used in multiple tests here
+        self.nodes = {
+            #Root
+            0: main.Node(nodeId=0, parent=-1, profile=main.initializeProfile('', 4, 'ACGT')),
+
+            1: main.Node(nodeId=1, parent=0, profile=main.initializeProfile('AAAA', 4, 'ACGT')),
+            2: main.Node(nodeId=2, parent=0, profile=main.initializeProfile('CCCC', 4, 'ACGT')),
+
+            3: main.Node(nodeId=3, parent=1, profile=main.initializeProfile('AAAA', 4, 'ACGT')),
+            4: main.Node(nodeId=4, parent=1, profile=main.initializeProfile('CCCT', 4, 'ACGT')),
+            5: main.Node(nodeId=5, parent=2, profile=main.initializeProfile('AAAG', 4, 'ACGT')),
+            6: main.Node(nodeId=6, parent=2, profile=main.initializeProfile('CCCG', 4, 'ACGT')),
+
+            7: main.Node(nodeId=7, parent=3, profile=main.initializeProfile('AAAA', 4, 'ACGT')),
+            8: main.Node(nodeId=8, parent=3, profile=main.initializeProfile('AAAA', 4, 'ACGT')),
+            9: main.Node(nodeId=9, parent=4, profile=main.initializeProfile('AAAA', 4, 'ACGT')),
+            10: main.Node(nodeId=10, parent=4, profile=main.initializeProfile('AAAA', 4, 'ACGT')),
+            11: main.Node(nodeId=11, parent=5, profile=main.initializeProfile('AAAA', 4, 'ACGT')),
+            12: main.Node(nodeId=12, parent=5, profile=main.initializeProfile('AAAA', 4, 'ACGT')),
+            13: main.Node(nodeId=13, parent=6, profile=main.initializeProfile('AAAA', 4, 'ACGT')),
+            14: main.Node(nodeId=14, parent=6, profile=main.initializeProfile('AAAA', 4, 'ACGT'))
+        }
+
+        self.nodes[0].children = [1, 2]
+        self.nodes[1].children = [3, 4]
+        self.nodes[2].children = [5, 6]
+        self.nodes[3].children = [7, 8]
+        self.nodes[4].children = [9, 10]
+        self.nodes[5].children = [11, 12]
+        self.nodes[6].children = [13, 14]
+
+    def testLogCorrectedDistance(self):
+        profile1 = self.nodes[1].profile
+        profile2 = self.nodes[2].profile
+        # This is a simplified test; you should replace it with your actual log-corrected distance function
+        distance = main.log_corrected_distance(profile1, profile2)
+        self.assertGreater(distance, 0)  # Check if the distance is positive
+
+    def testNNISwap(self):
+        main.perform_nni(self.nodes[0], self.nodes)
+        
+        # Assert changes in the node's children or structure to verify the swap
+        # The specific assertion will depend on how perform_nni is supposed to alter the tree
+        self.assertNotEqual(self.nodes[1].children, [3, 4]) 
+        self.assertEqual(self.nodes[1].children, [3, 5])
+
+
+    def testMultipleNNIRounds(self):
+        rounds = 3  # Example number of rounds
+        main.perform_nni_rounds(self.nodes, rounds)
+        # Verify the structure of the tree after N rounds
+        # The specifics of this test will depend on the expected outcome of the NNIs
+        self.assertNotEqual(self.nodes[1].children, [3, 4]) 
+        self.assertEqual(self.nodes[1].children, [3, 5])  # Example assertion
+
+    #Not yet implemented 
+        
+    # def testProfileRecomputationAfterNNI(self):
+    #     original_profile = self.nodes[1].profile.copy()
+    #     main.perform_nni(self.nodes[1], self.nodes)
+
+    #     # Assert that the profile has been recomputed and changed
+    #     self.assertNotEqual(self.nodes[1].profile, original_profile)
 
 if __name__ == '__main__':
     unittest.main()
