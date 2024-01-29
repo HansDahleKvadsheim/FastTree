@@ -241,12 +241,12 @@ class TestNNIFunctions(unittest.TestCase):
 
     #Not yet implemented 
         
-    # def testProfileRecomputationAfterNNI(self):
-    #     original_profile = self.nodes[1].profile.copy()
-    #     main.perform_nni(self.nodes[1], self.nodes)
+    def testProfileRecomputationAfterNNI(self):
+        original_profile = self.nodes[1].profile.copy()
+        main.perform_nni(self.nodes[0], self.nodes)
 
-    #     # Assert that the profile has been recomputed and changed
-    #     self.assertNotEqual(self.nodes[1].profile, original_profile)
+        # Assert that the profile has been recomputed and changed
+        self.assertNotEqual(self.nodes[1].profile, original_profile)
 
 if __name__ == '__main__':
     unittest.main()
