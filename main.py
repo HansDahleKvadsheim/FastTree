@@ -55,7 +55,6 @@ class Node:
         :return: The list of top hits for this node
         """
         # Keep a list of top hits for this sequence
-        print("dingdong")
         top_hits = []
 
         for nodeId in active_nodes:
@@ -93,7 +92,7 @@ class Node:
         self.topHits = top_hits[:m]
 
     def New_top_hits(self, nodes: nodeList, active_nodes: list[int], m: int, totalProfile: profile) -> topHitsList:
-        print("pling1")
+        print("ding")
         top_hits = []
 
         for nodeId in active_nodes:
@@ -107,7 +106,7 @@ class Node:
 
         # Sort based on score
         top_hits.sort(key=lambda x: x[1])
-        n = min(m, len(active_nodes)-1)
+        n = min(m, len(top_hits))
         self.topHits = top_hits[:n]
 
         for neighbour, _ in top_hits[:n]:
@@ -115,7 +114,7 @@ class Node:
             # If the top hits of the neighbour is still empty
             # Possible add an addition check which also must be true:
             #
-            neighbourNode.refresh_top_hits(top_hits[:n], n, nodeList, totalProfile)
+            neighbourNode.refresh_top_hits([(self.nodeId, 0)] + top_hits[:min(2*m, len(top_hits))], m, nodes, totalProfile)
 
 
         return [(self.nodeId, 0)] + top_hits
@@ -123,28 +122,40 @@ class Node:
 
 
     def refresh_top_hits(self, seed_top_hits: topHitsList, m: int, nodes: nodeList, totalProfile: profile) -> None:
-        print("pling2")
+        print("dong")
+        # new_top_hits = []
+        # for hit, _ in seed_top_hits:
+        #     if hit == self.nodeId:
+        #         continue
+        #     hitNode = nodes[hit]
+        #     score = nodeDistance(self, hitNode) - profileDistance(self.profile, totalProfile) - profileDistance(hitNode.profile, totalProfile)
+        #     new_top_hits.append((hit, score))
+
+        # new_top_hits.sort(key=lambda x: x[1])
+
+        # combinedList = list(dict.fromkeys(self.topHits[:m] + new_top_hits[:m]))
+
+        # combinedTophits = []
+        # for child in combinedList:
+        #     node = nodes[child[0]]
+        #     score = profileDistance(node.profile, newNode.profile) - profileDistance(self.profile, totalProfile) - profileDistance(hitNode.profile, totalProfile)
+        #     combinedTophits.append((child[0], score))
+
+        # combinedTophits.sort(key=lambda x: x[1])
+
+        # self.topHits = combinedTophits[:min(m, len(combinedTophits))]
+
         new_top_hits = []
-        for hit, _ in seed_top_hits:
+        for hit, _ in seed_top_hits[:min(JOIN_SAFETY_FACTOR * m, len(seed_top_hits))]:
             if hit == self.nodeId:
                 continue
             hitNode = nodes[hit]
+            # Take the neighbour criterion for score: d_u(i, j) - r(i) - r(j),  r(x) = p(x, T)
             score = nodeDistance(self, hitNode) - profileDistance(self.profile, totalProfile) - profileDistance(hitNode.profile, totalProfile)
             new_top_hits.append((hit, score))
 
         new_top_hits.sort(key=lambda x: x[1])
-
-        combinedList = list(dict.fromkeys(self.topHits[:m] + new_top_hits[:m]))
-
-        combinedTophits = []
-        for child in combinedList:
-            node = nodes[child[0]]
-            score = profileDistance(node.profile, newNode.profile) - profileDistance(self.profile, totalProfile) - profileDistance(hitNode.profile, totalProfile)
-            combinedTophits.append((child[0], score))
-
-        combinedTophits.sort(key=lambda x: x[1])
-
-        self.topHits = combinedTophits[:m]
+        self.topHits = new_top_hits[:min(m, len(new_top_hits))]
 
 
 
@@ -157,6 +168,7 @@ TOP_HITS_CLOSENESS = 0.5
 ROOT_NODE_ID = 0
 VERBOSE = True
 REFRESH_FACTOR = 0.8
+MAX_AGE = 5
 
 # ======================= Util functions ====================================
 def readFile(fileName: str) -> list[str]:
@@ -359,14 +371,9 @@ def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList) -> Node:
     node1.active = False
     node2.active = False
 
-    if len(newNode.topHits) <= REFRESH_FACTOR*m and len(activesNodes) > m:
-            print("recalc topHits")
-            mergedNode.New_top_hits(nodeList, activesNodes, m, totalProfile)
-
     return newNode
 
 def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int], totalProfile: profile):
-    print
     seedSequences = nodes[ROOT_NODE_ID].children.copy()
 
     while seedSequences != []:
@@ -405,8 +412,7 @@ def findBestJoin(topHits: topHitsList):
     return bestCandidate
 
 def log_corrected_distance(profile1, profile2):
-    # Implement the log-corrected distance calculation between two profiles
-    # This is a simplified placeholder; you'll need to implement the actual calculation
+    # This is a simplified placeholder; We'll need to implement the actual calculation
     return math.log(1 + profileDistance(profile1, profile2))
 
 
@@ -556,6 +562,18 @@ if __name__ == '__main__':
         nodes[mergedNode.nodeId] = mergedNode
         #update the total profile
         totalProfile = updateTotalProfile((len(activesNodes)), mergedNode.profile, totalProfile, bestHit[0].profile, bestHit[1].profile)
-    
-        
+        if ((len(mergedNode.topHits) <= REFRESH_FACTOR*m or mergedNode.age >= MAX_AGE)) :
+            top_hits = mergedNode.initialize_top_hits(nodes, activesNodes, m, totalProfile)
+            print("ding")
+            for neighbour, _ in top_hits[:m]:
+                neighbourNode = nodes[neighbour]
+             
+                if (not neighbourNode.topHits and
+                        profileDistance(mergedNode.profile, neighbourNode.profile)/profileDistance(mergedNode.profile, nodes[top_hits[2*m-1][0]].profile) < TOP_HITS_CLOSENESS):
+                    # The neighbour is a 'close neighbour', so we estimate the top hits for it
+                    neighbourNode.approximate_top_hits(top_hits, m, nodes, totalProfile)
+
+
+    n = int(math.log2(len(nodes))) + 3
+    perform_nni_rounds(nodes, n)
     print(createNewick(nodes))
