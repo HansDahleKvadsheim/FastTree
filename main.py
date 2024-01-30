@@ -60,8 +60,7 @@ class Node:
             seq = nodes[nodeId]
             # we are only calculating the distance now, not the criterion that should be minimized
             # criterion = d_u(i,j) - r(i) - r(j)
-            score = nodeDistance((self.profile, seq.profile) - profileDistance(self.profile, totalProfile)
-                     - profileDistance(seq.profile, totalProfile))
+            score = nodeDistance(self, seq) - profileDistance(self.profile, totalProfile) - profileDistance(seq.profile, totalProfile)
             top_hits.append((nodeId, score))
 
         # Sort based on score
@@ -69,13 +68,13 @@ class Node:
         self.topHits = top_hits[:m]
         return [(self.nodeId, 0)] + top_hits
     
-    def approximate_top_hits(self, seed_top_hits: topHitsList, m: int, nodes: nodeList) -> None:
+    def approximate_top_hits(self, seed_top_hits: topHitsList, m: int, nodes: nodeList, totalProfile: profile) -> None:
         top_hits = []
         for hit, _ in seed_top_hits[:JOIN_SAFETY_FACTOR * m]:
             if hit == self.nodeId:
                 continue
             hitNode = nodes[hit]
-            score = profileDistance(self.profile, hitNode.profile)
+            score = nodeDistance(self, hitNode) - profileDistance(self.profile, totalProfile) - profileDistance(hitNode.profile, totalProfile)
             top_hits.append((hit, score))
 
         top_hits.sort(key=lambda x: x[1])
@@ -126,7 +125,7 @@ def initializeProfile(genome: str, length: int, alphabet: str = ALPHABET) -> pro
 
     return [{base: float(genome[i] == base) for base in alphabet} for i in range(len(genome))]
 
-def computeTotalProfile(nodes: dict[int: Node]) -> profile:
+def computeTotalProfile(nodes: nodeList) -> profile:
     """
     Compute the total profile using the profiles from certain nodes
     :param nodes: The nodes to use to compute the total profile
@@ -163,8 +162,11 @@ def updateTotalProfile(amountOfTerms: int, newProfile, totalProfile, oldProfile1
     # If the old inactive nodes need to be removed
     for i in range(genomeLength):
         for key in totalProfile[i]:
+            # Remove oldProfile1 from the total profile
             totalProfile[i][key] = ((totalProfile[i][key] * amountOfTerms) - oldProfile1[i][key]) / (amountOfTerms - 1)
+            # Remove oldProfile2 from the total profile
             totalProfile[i][key] = ((totalProfile[i][key] * (amountOfTerms-1)) - oldProfile2[i][key]) / (amountOfTerms - 2)
+            # Add the merged profile to the total profile
             totalProfile[i][key] = totalProfile[i][key] + (newProfile[i][key] - totalProfile[i][key]) / (amountOfTerms - 1)
 
     return totalProfile
@@ -267,7 +269,7 @@ def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList) -> Node:
 
     return newNode
 
-def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int]):
+def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int], totalProfile: profile):
     seedSequences = nodes[ROOT_NODE_ID].children
 
     while seedSequences != []:
@@ -277,7 +279,7 @@ def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int]):
         seedNode = nodes[seed]
 
         # Generate a top hits list for that sequence by comparing it with the neighbour joining criterion
-        top_hits = seedNode.initialize_top_hits(nodes, activeNodes, m)
+        top_hits = seedNode.initialize_top_hits(nodes, activeNodes, m, totalProfile)
 
         # For each neighbour in the top m hits (the closest m neighbours)
         for neighbour, _ in top_hits[:m]:
@@ -288,7 +290,7 @@ def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int]):
             if (not neighbourNode.topHits and
                     profileDistance(seedNode.profile, neighbourNode.profile)/profileDistance(seedNode.profile, nodes[top_hits[2*m-1][0]].profile) < 0.50):
                 # The neighbour is a 'close neighbour', so we estimate the top hits for it
-                neighbourNode.approximate_top_hits(top_hits, m, nodes)
+                neighbourNode.approximate_top_hits(top_hits, m, nodes, totalProfile)
                 seedSequences.remove(neighbour)
 
 def findBestJoin(topHits: topHitsList):
@@ -328,7 +330,7 @@ if __name__ == '__main__':
 
     # create initial top Hits
     m = math.ceil(amountOfGenomes ** 0.5)
-    initialize_top_hits(m, nodes, activesNodes)
+    initialize_top_hits(m, nodes, activesNodes, totalProfile)
 
     # Do N - 3 joins
     while len(activesNodes) > 3:

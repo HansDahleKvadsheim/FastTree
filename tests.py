@@ -72,28 +72,32 @@ class TestFasttreeMethods(unittest.TestCase):
 
     def testSeedTopHitsLength(self):
         nodes = {
-            1: main.Node(1, -1, profile=main.initializeProfile('ACGT', 4, 'ACGT')),
-            2: main.Node(2, -1, profile=main.initializeProfile('ACGA', 4, 'ACGT')),
-            3: main.Node(3, -1, profile=main.initializeProfile('ACCA', 4, 'ACGT')),
-            4: main.Node(4, -1, profile=main.initializeProfile('AAAC', 4, 'ACGT'))
+            0: main.Node(1, -1, profile=main.initializeProfile('', 4, 'ACGT')),
+            1: main.Node(1, 0, profile=main.initializeProfile('ACGT', 4, 'ACGT')),
+            2: main.Node(2, 0, profile=main.initializeProfile('ACGA', 4, 'ACGT')),
+            3: main.Node(3, 0, profile=main.initializeProfile('ACCA', 4, 'ACGT')),
+            4: main.Node(4, 0, profile=main.initializeProfile('AAAC', 4, 'ACGT'))
         }
-
+        nodes[0].children = [1,2,3,4]
         m = 2
         activeNodes = [1, 2, 3, 4]
-        top_hits = nodes[1].initialize_top_hits(nodes, activeNodes, m)
+        totalProfile = main.computeTotalProfile(nodes)
+        top_hits = nodes[1].initialize_top_hits(nodes, activeNodes, m, totalProfile)
         self.assertEqual(4, len(top_hits))
 
     def testSeedTopHits(self):
         nodes = {
-            1: main.Node(1, -1, profile=main.initializeProfile('ACGT', 4, 'ACGT')),
-            2: main.Node(2, -1, profile=main.initializeProfile('ACGA', 4, 'ACGT')),
-            3: main.Node(3, -1, profile=main.initializeProfile('ACCA', 4, 'ACGT')),
-            4: main.Node(4, -1, profile=main.initializeProfile('AAAC', 4, 'ACGT'))
+            0: main.Node(0, -1, main.initializeProfile('', 4, 'ACGT')),
+            1: main.Node(1, 0, profile=main.initializeProfile('ACGT', 4, 'ACGT')),
+            2: main.Node(2, 0, profile=main.initializeProfile('ACGA', 4, 'ACGT')),
+            3: main.Node(3, 0, profile=main.initializeProfile('ACCA', 4, 'ACGT')),
+            4: main.Node(4, 0, profile=main.initializeProfile('AAAC', 4, 'ACGT'))
         }
-
+        nodes[0].children = [1,2,3,4]
         m = 2
         active_nodes = [1, 2, 3, 4]
-        top_hits = nodes[1].initialize_top_hits(nodes, active_nodes, m)
+        totalProfile = main.computeTotalProfile(nodes)
+        top_hits = nodes[1].initialize_top_hits(nodes, active_nodes, m, totalProfile)
         self.assertEqual(1, top_hits[0][0])
         self.assertEqual(2, top_hits[1][0])
         self.assertEqual(3, top_hits[2][0])
@@ -103,17 +107,19 @@ class TestFasttreeMethods(unittest.TestCase):
 
     def testTopHitsApproximation(self):
         nodes = {
-            1: main.Node(1, -1, profile=main.initializeProfile('ACGT', 4, 'ACGT')),
-            2: main.Node(2, -1, profile=main.initializeProfile('ACGA', 4, 'ACGT')),
-            3: main.Node(3, -1, profile=main.initializeProfile('AGGT', 4, 'ACGT')),
-            4: main.Node(4, -1, profile=main.initializeProfile('CGGT', 4, 'ACGT')),
-            5: main.Node(5, -1, profile=main.initializeProfile('AAAT', 4, 'ACGT'))
+            0: main.Node(0, -1, main.initializeProfile('', 4, 'ACGT')),
+            1: main.Node(1, 0, profile=main.initializeProfile('ACGT', 4, 'ACGT')),
+            2: main.Node(2, 0, profile=main.initializeProfile('ACGA', 4, 'ACGT')),
+            3: main.Node(3, 0, profile=main.initializeProfile('AGGT', 4, 'ACGT')),
+            4: main.Node(4, 0, profile=main.initializeProfile('CGGT', 4, 'ACGT')),
+            5: main.Node(5, 0, profile=main.initializeProfile('AAAT', 4, 'ACGT'))
         }
-
+        nodes[0].children = [1, 2, 3, 4, 5]
+        totalProfile = main.computeTotalProfile(nodes)
         m = 2
         active_nodes = [1, 2, 3, 4, 5]
-        top_hits = nodes[1].initialize_top_hits(nodes, active_nodes, m)
-        nodes[2].approximate_top_hits(top_hits, m, nodes)
+        top_hits = nodes[1].initialize_top_hits(nodes, active_nodes, m, totalProfile)
+        nodes[2].approximate_top_hits(top_hits, m, nodes, totalProfile)
 
         self.assertEqual(1, nodes[2].topHits[0][0])
         self.assertEqual(3, nodes[2].topHits[1][0])
@@ -130,8 +136,8 @@ class TestFasttreeMethods(unittest.TestCase):
         nodes[0].children = [1, 2, 3, 4, 5]
         m = 2
         activeNodes = [1, 2, 3, 4, 5]
-
-        main.initialize_top_hits(m, nodes, activeNodes)
+        totalProfile = main.computeTotalProfile(nodes)
+        main.initialize_top_hits(m, nodes, activeNodes, totalProfile)
         for leaf in activeNodes:
             self.assertEqual(2, len(nodes[leaf].topHits))
 
@@ -152,7 +158,7 @@ class TestFasttreeMethods(unittest.TestCase):
         }
         nodes[1].children = [2, 3]
         nodes[0].children = [1, 4, 5]
-
+        activeNodes = nodes[0].children
         expectedProfile = [
             {'A': 0.5 / 3, 'C': 1 / 3, 'G': 0, 'T': 0.5},
             {'A': 1, 'C': 0, 'G': 0, 'T': 0},
@@ -161,26 +167,7 @@ class TestFasttreeMethods(unittest.TestCase):
         ]
         self.assertEqual(expectedProfile, main.computeTotalProfile(nodes))
 
-    def testUpdateTotalProfileWithoutMerge(self):
-        totalProfile = [
-            {'A': 0.5, 'C': 0, 'G': 0, 'T': 0.5},
-            {'A': 1, 'C': 0, 'G': 0, 'T': 0},
-            {'A': 0, 'C': 0.5, 'G': 0, 'T': 0.5},
-            {'A': 0, 'C': 0, 'G': 0, 'T': 1}
-        ]
-        newProfile = main.initializeProfile('ACGT', 4, 'ACGT')
-        expectedProfile = [
-            {'A': 2 / 3, 'C': 0.0, 'G': 0.0, 'T': 1 / 3},
-            {'A': 2 / 3, 'C': 1 / 3, 'G': 0.0, 'T': 0.0},
-            {'A': 0.0, 'C': 1 / 3, 'G': 1 / 3, 'T': 1 / 3},
-            {'A': 0.0, 'C': 0.0, 'G': 0.0, 'T': 1.0}
-        ]
-        totalProfile = main.updateTotalProfile(3, newProfile, totalProfile)
-        for i in range(4):
-            for c in 'ACGT':
-                self.assertAlmostEqual(expectedProfile[i][c], totalProfile[i][c])
-
-    def testUpdateTotalProfileWithMerge(self):
+    def testUpdateTotalProfile(self):
         totalProfile = [
             {'A': 1/3, 'C': 0, 'G': 0, 'T': 2/3},
             {'A': 2/3, 'C': 1/3, 'G': 0, 'T': 0},
