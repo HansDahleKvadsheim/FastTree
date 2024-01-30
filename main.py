@@ -55,6 +55,7 @@ class Node:
         :return: The list of top hits for this node
         """
         # Keep a list of top hits for this sequence
+        print("dingdong")
         top_hits = []
 
         for nodeId in active_nodes:
@@ -80,7 +81,7 @@ class Node:
         :param totalProfile: The current total profile over all active nodes
         """
         top_hits = []
-        for hit, _ in seed_top_hits[:JOIN_SAFETY_FACTOR * m]:
+        for hit, _ in seed_top_hits[:min(JOIN_SAFETY_FACTOR * m, len(seed_top_hits))]:
             if hit == self.nodeId:
                 continue
             hitNode = nodes[hit]
@@ -90,6 +91,60 @@ class Node:
 
         top_hits.sort(key=lambda x: x[1])
         self.topHits = top_hits[:m]
+
+    def New_top_hits(self, nodes: nodeList, active_nodes: list[int], m: int, totalProfile: profile) -> topHitsList:
+        print("pling1")
+        top_hits = []
+
+        for nodeId in active_nodes:
+            if nodeId == self.nodeId:
+                continue
+            seq = nodes[nodeId]
+            # we are only calculating the distance now, not the criterion that should be minimized
+            # criterion = d_u(i,j) - r(i) - r(j)
+            score = nodeDistance(self, seq) - profileDistance(self.profile, totalProfile) - profileDistance(seq.profile, totalProfile)
+            top_hits.append((nodeId, score))
+
+        # Sort based on score
+        top_hits.sort(key=lambda x: x[1])
+        n = min(m, len(active_nodes)-1)
+        self.topHits = top_hits[:n]
+
+        for neighbour, _ in top_hits[:n]:
+            neighbourNode = nodes[neighbour]
+            # If the top hits of the neighbour is still empty
+            # Possible add an addition check which also must be true:
+            #
+            neighbourNode.refresh_top_hits(top_hits[:n], n, nodeList, totalProfile)
+
+
+        return [(self.nodeId, 0)] + top_hits
+    
+
+
+    def refresh_top_hits(self, seed_top_hits: topHitsList, m: int, nodes: nodeList, totalProfile: profile) -> None:
+        print("pling2")
+        new_top_hits = []
+        for hit, _ in seed_top_hits:
+            if hit == self.nodeId:
+                continue
+            hitNode = nodes[hit]
+            score = nodeDistance(self, hitNode) - profileDistance(self.profile, totalProfile) - profileDistance(hitNode.profile, totalProfile)
+            new_top_hits.append((hit, score))
+
+        new_top_hits.sort(key=lambda x: x[1])
+
+        combinedList = list(dict.fromkeys(self.topHits[:m] + new_top_hits[:m]))
+
+        combinedTophits = []
+        for child in combinedList:
+            node = nodes[child[0]]
+            score = profileDistance(node.profile, newNode.profile) - profileDistance(self.profile, totalProfile) - profileDistance(hitNode.profile, totalProfile)
+            combinedTophits.append((child[0], score))
+
+        combinedTophits.sort(key=lambda x: x[1])
+
+        self.topHits = combinedTophits[:m]
 
 
 
@@ -101,6 +156,7 @@ JOIN_SAFETY_FACTOR = 2
 TOP_HITS_CLOSENESS = 0.5
 ROOT_NODE_ID = 0
 VERBOSE = True
+REFRESH_FACTOR = 0.8
 
 # ======================= Util functions ====================================
 def readFile(fileName: str) -> list[str]:
@@ -273,34 +329,44 @@ def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList) -> Node:
     #Update the age of the newNode
     newNode.age = 1 + max(node1.age, node2.age)
 
-    # Remove children nodes from top Hits list
-    #node1.topHits.remove(node2.nodeId)
-    #node2.topHits.remove(node1.nodeId)
+    #Remove children nodes from top Hits list
+    node1_topHits = list(filter(lambda x: x[0] != node2.nodeId, node1.topHits))
+    node2_topHits = list(filter(lambda x: x[0] != node1.nodeId, node2.topHits))
 
     #Combine top Hits list and remove duplicates
-    combinedList = list(dict.fromkeys(node1.topHits + node2.topHits))
+    combinedList = list(dict.fromkeys(node1_topHits + node2_topHits))
+
+    # combinedList.remove(node1.nodeId)
+    # combinedList.remove(node2.nodeId)
 
     combinedTophits = []
     for child in combinedList:
         node = nodes[child[0]]
-        score = profileDistance(node.profile, newNode.profile)
+        score = nodeDistance(node, newNode) - profileDistance(node.profile, totalProfile) - profileDistance(newNode.profile, totalProfile)
         combinedTophits.append((child[0], score))
 
     combinedTophits.sort(key=lambda x: x[1])
 
     #In case tophits node1 == node2
-    if len(combinedTophits) == len(node1.topHits) and len(combinedTophits) == len(node2.topHits):
-        newNode.topHits = combinedTophits[:m-1]
+    if len(combinedTophits) < m:
+        newNode.topHits = combinedTophits
     else:
         newNode.topHits = combinedTophits[:m]
+
+    print(len(newNode.topHits))
 
     # Set old nodes to inactive
     node1.active = False
     node2.active = False
 
+    if len(newNode.topHits) <= REFRESH_FACTOR*m and len(activesNodes) > m:
+            print("recalc topHits")
+            mergedNode.New_top_hits(nodeList, activesNodes, m, totalProfile)
+
     return newNode
 
 def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int], totalProfile: profile):
+    print
     seedSequences = nodes[ROOT_NODE_ID].children.copy()
 
     while seedSequences != []:
@@ -328,7 +394,7 @@ def findBestJoin(topHits: topHitsList):
     bestCandidate = None
     bestCriterion = float("inf")
     for hit in topHits:
-        node = hit[1].findActiveAncestor()
+        node = hit[0].findActiveAncestor(nodeList)
         node.age += 1
         distance = hit[1]
 
@@ -463,7 +529,7 @@ if __name__ == '__main__':
 
         # Get the best m hits over all nodes
         toppestHits = []
-        for _ in range(m):
+        for _ in range(min(m, q.qsize())):
             toppestHits.append(q.get())
 
         # Compute the score for all best hits and take the best one
@@ -490,5 +556,6 @@ if __name__ == '__main__':
         nodes[mergedNode.nodeId] = mergedNode
         #update the total profile
         totalProfile = updateTotalProfile((len(activesNodes)), mergedNode.profile, totalProfile, bestHit[0].profile, bestHit[1].profile)
-
+    
+        
     print(createNewick(nodes))
