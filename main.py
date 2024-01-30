@@ -133,7 +133,7 @@ def createNewick(nodes, currentNode: int = ROOT_NODE_ID) -> str:
     for child in currentNode.children:
         childNode = nodes[child]
         if not childNode.children:
-            output += childNode.label + ','
+            output += childNode.label + ':' + str(childNode.distanceToParent) + ','
         else:
             output += createNewick(nodes, childNode.nodeId) + ':' + str(childNode.distanceToParent) + ','
     output = output[:-1] + ')'
