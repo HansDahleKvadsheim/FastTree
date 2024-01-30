@@ -307,6 +307,86 @@ def findBestJoin(topHits: topHitsList):
 
     return bestCandidate
 
+def log_corrected_distance(profile1, profile2):
+    # Implement the log-corrected distance calculation between two profiles
+    # This is a simplified placeholder; you'll need to implement the actual calculation
+    return math.log(1 + profileDistance(profile1, profile2))
+
+
+def perform_nni(node1: Node, nodes: nodeList) -> None:
+    """
+    Performs the nearest neighbor interchange on a given node (F1) and its parent (F2).
+    :param node: a child node (F2) to perform NNI on. will not work on root
+    :param nodes: The list of all nodes.
+    """
+    parentId = node1.parent
+    if parentId < 0:
+        print("cannot do NNI on root node")
+        return
+    
+    node2 = nodes[parentId]
+
+    if len(node1.children) < 2 or len(node2.children) < 2:
+        print("cannot preform NNI on leaf nodes")
+        return
+    
+    # if node1.nodeId in node2.children:
+    A, B = nodes[node1.children[0]], nodes[node1.children[1]]
+
+    siblings = []
+    for sibling in node2.children:
+        if sibling != node1.nodeId:
+            siblings.append(sibling)
+
+    C = nodes[siblings[0]]
+    if parentId == 0:
+        D = nodes[siblings[1]]
+    else:
+        D = nodes[node2.parent]
+    
+    # Calculate distances for current and alternate topologies
+    current_distance = log_corrected_distance(A.profile, B.profile) + log_corrected_distance(C.profile, D.profile)
+    alt_distance_1 = log_corrected_distance(A.profile, C.profile) + log_corrected_distance(B.profile, D.profile)
+    alt_distance_2 = log_corrected_distance(B.profile, C.profile) + log_corrected_distance(A.profile, D.profile)
+
+    # Determine if an alternate topology has a lower distance
+    if min(alt_distance_1, alt_distance_2) < current_distance:
+        if alt_distance_1 < alt_distance_2:
+            # Perform swap for the first alternate topology
+            node1.children = [A.nodeId, C.nodeId]
+            if parentId == 0:
+                node2.children = [node1.nodeId, B.nodeId, D.nodeId]
+            else:
+                node2.children = [node1.nodeId, B.nodeId]
+        else:
+            # Perform swap for the second alternate topology
+            node1.children = [B.nodeId, C.nodeId]
+            if parentId == 0:
+                node2.children = [node1.nodeId, A.nodeId, D.nodeId]
+            else:
+                node2.children = [node1.nodeId, A.nodeId]
+        # Recompute profiles for affected nodes
+        for n in range(len(node1.children)):
+            nodes[node1.children[n]].parent = node1.nodeId
+        for n in range(len(node2.children)):
+            nodes[node2.children[n]].parent = node2.nodeId
+        
+        node1.profile = mergeProfiles(nodes[node1.children[0]].profile, nodes[node1.children[1]].profile)
+        if parentId != 0:
+            node2.profile = mergeProfiles(nodes[node2.children[0]].profile, nodes[node2.children[1]].profile)  
+
+
+def perform_nni_rounds(nodes: nodeList, rounds: int) -> None:
+    """
+    Applies NNI to all applicable nodes in the tree.
+    :param nodes: The list of all nodes.
+    :param activeNodes: The list of active nodes.
+    """
+    for _ in range(rounds):
+        for node_id, node in nodes.items():
+            if len(node.children) == 2 and node_id != 0:  # Ensure it's an internal node with two children (not root)
+                perform_nni(node, nodes)
+
 
 # =============================== Algorithm =======================================
 
@@ -365,6 +445,6 @@ if __name__ == '__main__':
         activesNodes.remove(bestHit[1].nodeId)
         activesNodes.append(mergedNode.nodeId)
         nodes[mergedNode.nodeId] = mergedNode
-
+        nodes[mergedNode.nodeId] = mergedNode
         #update the total profile
         totalProfile = updateTotalProfile((len(activesNodes)), mergedNode.profile, totalProfile, bestHit[0].profile, bestHit[1].profile)
