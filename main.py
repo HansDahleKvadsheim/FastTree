@@ -1,15 +1,13 @@
-# Neighbour joining with profiles
-# Nearest neighbour interchange
-# Top hits heuristic
 import queue
 import random
 import math
 
-# Typehints
+# ========================= Typehints ===============================
 profile = list[dict[str, float]]
 topHitsList = list[tuple[int, float]]
 nodeList = dict[int, 'Node']
 
+# ========================= Classes =============================
 class Node:
     def __init__(self, nodeId: int, parent: int, profile: profile = None, children=None):
         if children is None:
@@ -24,13 +22,18 @@ class Node:
         self.age = 0
 
     def __lt__(self, other):
+        # Used for the priority queue when determining the top hits order in case there are top hits with the same score
         return self.nodeId > other.nodeId
 
     def __repr__(self):
-        return ("{id: " + str(self.nodeId) +
-                " parent: " + str(self.parent) +
-                "\nchildren: " + ' '.join([str(n) for n in self.children]) +
-                "\ntophits: " + ' '.join([str(n[0]) for n in self.topHits]) + '}')
+        """
+        Used for easy string representation of the node should we desire to print the contents.
+        Mainly meant for debugging purposes
+        """
+        return ("id: " + str(self.nodeId) +
+                ", parent: " + str(self.parent) +
+                ", children: " + ' '.join([str(n) for n in self.children] if self.children else ['none']) +
+                ", tophits: " + ' '.join([str(n[0]) for n in self.topHits]))
 
     def findActiveAncestor(self, nodes: nodeList) -> int:
         """
@@ -68,12 +71,20 @@ class Node:
         self.topHits = top_hits[:m]
         return [(self.nodeId, 0)] + top_hits
     
-    def approximate_top_hits(self, seed_top_hits: topHitsList, m: int, nodes: nodeList, totalProfile: profile) -> None:
+    def approximate_top_hits(self, seed_top_hits: topHitsList, m: int, nodes: nodeList, totalProfile: profile):
+        """
+        Approximates the top hits list for this node based on the top hits list from the seed
+        :param seed_top_hits: The top hits from the seeds
+        :param m: m
+        :param nodes: The collection of all nodes in the tree
+        :param totalProfile: The current total profile over all active nodes
+        """
         top_hits = []
         for hit, _ in seed_top_hits[:JOIN_SAFETY_FACTOR * m]:
             if hit == self.nodeId:
                 continue
             hitNode = nodes[hit]
+            # Take the neighbour criterion for score: d_u(i, j) - r(i) - r(j),  r(x) = p(x, T)
             score = nodeDistance(self, hitNode) - profileDistance(self.profile, totalProfile) - profileDistance(hitNode.profile, totalProfile)
             top_hits.append((hit, score))
 
@@ -85,9 +96,11 @@ class Node:
 # =========================== Globals =======================================
 # Constants
 ALPHABET = 'ACGT'
-DATA_FILE = 'test-small.aln'
+DATA_FILE = 'fasttree-input.aln'
 JOIN_SAFETY_FACTOR = 2
+TOP_HITS_CLOSENESS = 0.5
 ROOT_NODE_ID = 0
+VERBOSE = True
 
 # ======================= Util functions ====================================
 def readFile(fileName: str) -> list[str]:
@@ -101,14 +114,23 @@ def readFile(fileName: str) -> list[str]:
 
     return [line.strip() for line in rawData if line[0] != '>']
 
-def createNewick(node: Node) -> str:
+def createNewick(nodes, currentNode: int = ROOT_NODE_ID) -> str:
+    """
+    Recursively builds a newick tree from the given data
+    :param nodes: the list of all nodes in the tree
+    :param currentNode: the root node of the tree, default 0
+    :return: the newick tree in string format
+    """
     output = '('
-    for child in node.children:
-        if not child.children:
-            output += str(child.nodeId) + ','
+    currentNode = nodes[currentNode]
+    for child in currentNode.children:
+        childNode = nodes[child]
+        if not childNode.children:
+            # subtract 1 because our tree uses 0 for the root node and the data uses 0 for the first genome
+            output += str(child-1) + ','
         else:
-            output += createNewick(child)
-    output = output[:-1] + ');'
+            output += createNewick(nodes, childNode.nodeId) + ','
+    output = output[:-1] + ')'
     return output
 
 # ======================= Algorithm functions ================================
@@ -135,13 +157,14 @@ def computeTotalProfile(nodes: nodeList) -> profile:
     alphabet = nodes[ROOT_NODE_ID].profile[0].keys()
     totalProfile = initializeProfile('', genomeLength, alphabet)
     activeNodes = nodes[ROOT_NODE_ID].children
-
+    # Add all frequencies to a single profile
     for nodeId in activeNodes:
         child = nodes[nodeId]
         for i in range(genomeLength):
             for key in child.profile[i].keys():
                 totalProfile[i][key] += child.profile[i][key]
 
+    # Divide every frequency by the number of active nodes
     for i in range(genomeLength):
         for key in totalProfile[i]:
             totalProfile[i][key] = totalProfile[i][key] / len(activeNodes)
@@ -150,7 +173,7 @@ def computeTotalProfile(nodes: nodeList) -> profile:
 
 def updateTotalProfile(amountOfTerms: int, newProfile, totalProfile, oldProfile1, oldProfile2) -> profile:
     """
-    Updates the total profile with the new profile and optionally deletes old profiles.
+    Updates the total profile with the new profile in O(La) time
     :param amountOfTerms: The amount of profiles which have been used to compute the total so far
     :param newProfile: The new profile to update the total profile with
     :param totalProfile: The current total profile
@@ -159,7 +182,6 @@ def updateTotalProfile(amountOfTerms: int, newProfile, totalProfile, oldProfile1
     :return: The updated total profile
     """
     genomeLength = len(newProfile)
-    # If the old inactive nodes need to be removed
     for i in range(genomeLength):
         for key in totalProfile[i]:
             # Remove oldProfile1 from the total profile
@@ -184,39 +206,43 @@ def mergeProfiles(profile1: profile, profile2: profile) -> profile:
     return [{base: (profile1[i][base] + profile2[i][base]) / 2 for base in alphabet} for i in range(genomeLength)]
 
 def profileDistance(i: profile, j: profile) -> float:
+    """
+    Computes the distance between two profiles using a %-difference notion
+    :param i: the first profile
+    :param j: the second profile
+    :return: the distance between profile i and profile j
+    """
     total = 0
     genomeLength = len(i)
-    # Go over every position
     for l in range(genomeLength):
-        # Calculate the distance between all possible combinations
         for key in i[l].keys():
             for otherKey in j[l].keys():
+                # Only add the product of frequencies if the bases are different
                 total += i[l][key] * j[l][otherKey] * int(key != otherKey)
 
     return total / genomeLength
 
 def nodeDistance(node1: Node, node2: Node) -> float:
     """
-    Calculates the distance between two nodes
+    Calculates the distance between two nodes using the formula
+    d_u(i, j) = P(i, j) - u_1 - u_2
     :param node1: The first node
     :param node2: The second node
-    :return: The distance
+    :return: The distance between the 2 nodes
     """
-    # d_u(i, j) = P(i, j) - u_1 - u_2
     return profileDistance(node1.profile, node2.profile) - node1.upDistance - node2.upDistance
 
 def calculateUpDistance(node: Node, nodes: nodeList) -> float:
     """
-    Calculates the updistance for a given node
+    Calculates the updistance for a given node, with 0 for leaves and
+    u(ij) = P(i, j) / 2 for inner nodes
     :param node: The node to calculate the updistance for
     :param nodes: The list of all nodes
     :return: The updistance for the node
     """
-    # Leafs are by definition 0
     if not node.children:
         return 0
 
-    # u(ij) = P(i, j) / 2
     node1 = nodes[node.children[0]]
     node2 = nodes[node.children[1]]
     return profileDistance(node1.profile, node2.profile) / 2
@@ -229,7 +255,12 @@ def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList) -> Node:
     :return: The newly made node having both param nodes as children
     """
     # Create new node
-    newNode = Node(len(nodes), 0, mergeProfiles(node1.profile, node2.profile))
+    newNode = Node(len(nodes), ROOT_NODE_ID, mergeProfiles(node1.profile, node2.profile))
+
+    # Remove previous nodes as children form their previous parents
+    nodes[ROOT_NODE_ID].children.append(newNode.nodeId)
+    nodes[node1.parent].children.remove(node1.nodeId)
+    nodes[node2.parent].children.remove(node2.nodeId)
 
     # Add old nodes as children
     newNode.children = [node1.nodeId, node2.nodeId]
@@ -270,7 +301,7 @@ def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList) -> Node:
     return newNode
 
 def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int], totalProfile: profile):
-    seedSequences = nodes[ROOT_NODE_ID].children
+    seedSequences = nodes[ROOT_NODE_ID].children.copy()
 
     while seedSequences != []:
         # Take an arbitrary seed sequence
@@ -288,7 +319,7 @@ def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int], totalPr
             # Possible add an addition check which also must be true:
             #
             if (not neighbourNode.topHits and
-                    profileDistance(seedNode.profile, neighbourNode.profile)/profileDistance(seedNode.profile, nodes[top_hits[2*m-1][0]].profile) < 0.50):
+                    profileDistance(seedNode.profile, neighbourNode.profile)/profileDistance(seedNode.profile, nodes[top_hits[2*m-1][0]].profile) < TOP_HITS_CLOSENESS):
                 # The neighbour is a 'close neighbour', so we estimate the top hits for it
                 neighbourNode.approximate_top_hits(top_hits, m, nodes, totalProfile)
                 seedSequences.remove(neighbour)
@@ -396,20 +427,28 @@ if __name__ == '__main__':
     genomeLength = len(data[0])
     amountOfGenomes = len(data)
 
+    if VERBOSE:
+        print('found {} genomes of length {}'.format(amountOfGenomes, genomeLength))
+        print('initializing star topology...')
+
     # Create initial star topology
-    nodes = {0: Node(0, -1, initializeProfile('', genomeLength, ALPHABET))}
+    nodes = {ROOT_NODE_ID: Node(ROOT_NODE_ID, -1, initializeProfile('', genomeLength, ALPHABET))}
     activesNodes = []
     for genome in data:
-        newNode = Node(len(nodes), 0, initializeProfile(genome, genomeLength, ALPHABET))
-        nodes[0].children.append(newNode.nodeId)
+        newNode = Node(len(nodes), ROOT_NODE_ID, initializeProfile(genome, genomeLength, ALPHABET))
+        nodes[ROOT_NODE_ID].children.append(newNode.nodeId)
         nodes[newNode.nodeId] = newNode
         activesNodes.append(newNode.nodeId)
 
+    if VERBOSE:
+        print('computing total profile...')
     # Create total profile
     totalProfile = computeTotalProfile(nodes)
 
     # create initial top Hits
     m = math.ceil(amountOfGenomes ** 0.5)
+    if VERBOSE:
+        print('initializing top hits...')
     initialize_top_hits(m, nodes, activesNodes, totalProfile)
 
     # Do N - 3 joins
@@ -439,6 +478,9 @@ if __name__ == '__main__':
                 bestHit = (node1, node2)
                 bestValue = score
 
+        if VERBOSE:
+            print('>> joining nodes {} and {}...'.format(bestHit[0].nodeId, bestHit[1].nodeId))
+
         # Merge the nodes
         mergedNode = mergeNodes(bestHit[0], bestHit[1], m, nodes)
         activesNodes.remove(bestHit[0].nodeId)
@@ -448,3 +490,5 @@ if __name__ == '__main__':
         nodes[mergedNode.nodeId] = mergedNode
         #update the total profile
         totalProfile = updateTotalProfile((len(activesNodes)), mergedNode.profile, totalProfile, bestHit[0].profile, bestHit[1].profile)
+
+    print(createNewick(nodes))
