@@ -306,11 +306,11 @@ def perform_nni(node1: Node, nodes: nodeList) -> None:
     :param nodes: The list of all nodes.
     """
     parentId = node1.parent
-    if parentId == -1:
+    if parentId < 0:
         print("cannot do NNI on root node")
         return
     
-    node2 = nodes[node1.parent]
+    node2 = nodes[parentId]
 
     if len(node1.children) < 2 or len(node2.children) < 2:
         print("cannot preform NNI on leaf nodes")
@@ -319,7 +319,6 @@ def perform_nni(node1: Node, nodes: nodeList) -> None:
     # if node1.nodeId in node2.children:
     A, B = nodes[node1.children[0]], nodes[node1.children[1]]
 
-    
     siblings = []
     for sibling in node2.children:
         if sibling != node1.nodeId:
@@ -350,12 +349,14 @@ def perform_nni(node1: Node, nodes: nodeList) -> None:
             node1.children = [B.nodeId, C.nodeId]
             if parentId == 0:
                 node2.children = [node1.nodeId, A.nodeId, D.nodeId]
-            node2.children = [node1.nodeId, A.nodeId]
+            else:
+                node2.children = [node1.nodeId, A.nodeId]
         # Recompute profiles for affected nodes
         for n in range(len(node1.children)):
             nodes[node1.children[n]].parent = node1.nodeId
         for n in range(len(node2.children)):
             nodes[node2.children[n]].parent = node2.nodeId
+        
         node1.profile = mergeProfiles(nodes[node1.children[0]].profile, nodes[node1.children[1]].profile)
         if parentId != 0:
             node2.profile = mergeProfiles(nodes[node2.children[0]].profile, nodes[node2.children[1]].profile)  
@@ -369,8 +370,8 @@ def perform_nni_rounds(nodes: nodeList, rounds: int) -> None:
     """
     for _ in range(rounds):
         for node_id, node in nodes.items():
-            if len(node.children) == 2:  # Ensure it's an internal node with two children
-                perform_nni(node, node.parent, nodes)
+            if len(node.children) == 2 and node_id != 0:  # Ensure it's an internal node with two children (not root)
+                perform_nni(node, nodes)
 
 
 # =============================== Algorithm =======================================

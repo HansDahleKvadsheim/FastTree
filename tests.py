@@ -198,10 +198,12 @@ class TestNNIFunctions(unittest.TestCase):
             6: main.Node(nodeId=6, parent=3, profile=main.initializeProfile('CCCG', 4, 'ACGT')), #C
 
             7: main.Node(nodeId=7, parent=5, profile=main.initializeProfile('CCCT', 4, 'ACGT')), #A
-            8: main.Node(nodeId=8, parent=5, profile=main.initializeProfile('AAAT', 4, 'ACGT')) #B
+            8: main.Node(nodeId=8, parent=5, profile=main.initializeProfile('AAAT', 4, 'ACGT')), #B
+            9: main.Node(nodeId=9, parent=0, profile=main.initializeProfile('TTTT', 4, 'ACGT')) 
+
 
         }
-        self.nodes[0].children = [1, 2]
+        self.nodes[0].children = [1, 2, 9]
         self.nodes[1].children = [3, 4]
         self.nodes[3].children = [5, 6]
         self.nodes[5].children = [7, 8]
@@ -223,13 +225,13 @@ class TestNNIFunctions(unittest.TestCase):
         #self.assertEqual(self.nodes[1].children, [3, 5])
 
 
-    # def testMultipleNNIRounds(self):
-    #     rounds = 3  # Example number of rounds
-    #     main.perform_nni_rounds(self.nodes, rounds)
-    #     # Verify the structure of the tree after N rounds
-    #     # The specifics of this test will depend on the expected outcome of the NNIs
-    #     self.assertNotEqual(self.nodes[1].children, [3, 4]) 
-    #     #self.assertEqual(self.nodes[1].children, [3, 5])  # Example assertion
+    def testMultipleNNIRounds(self):
+        rounds = 3  # Example number of rounds
+        main.perform_nni_rounds(self.nodes, rounds)
+        # Verify the structure of the tree after N rounds
+        # The specifics of this test will depend on the expected outcome of the NNIs
+        self.assertNotEqual(self.nodes[5].children, [7, 8]) 
+        #self.assertEqual(self.nodes[1].children, [3, 5])  # Example assertion
 
     #Not yet implemented 
         
