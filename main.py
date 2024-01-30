@@ -22,6 +22,7 @@ class Node:
         self.active = True
         self.age = 0
         self.label = str(nodeId)
+        self.distanceToParent = 1
 
     def __lt__(self, other):
         # Used for the priority queue when determining the top hits order in case there are top hits with the same score
@@ -134,7 +135,7 @@ def createNewick(nodes, currentNode: int = ROOT_NODE_ID) -> str:
         if not childNode.children:
             output += childNode.label + ','
         else:
-            output += createNewick(nodes, childNode.nodeId) + ','
+            output += createNewick(nodes, childNode.nodeId) + ':' + str(childNode.distanceToParent) + ','
     output = output[:-1] + ')'
     return output
 
@@ -497,8 +498,11 @@ if __name__ == '__main__':
         activesNodes.remove(bestHit[1].nodeId)
         activesNodes.append(mergedNode.nodeId)
         nodes[mergedNode.nodeId] = mergedNode
-        nodes[mergedNode.nodeId] = mergedNode
         #update the total profile
         totalProfile = updateTotalProfile((len(activesNodes)), mergedNode.profile, totalProfile, bestHit[0].profile, bestHit[1].profile)
+
+    if VERBOSE:
+        print('performing NNI...')
+    perform_nni_rounds(nodes, len(nodes))
 
     print(createNewick(nodes))
