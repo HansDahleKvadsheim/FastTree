@@ -1,6 +1,7 @@
 import queue
 import random
 import math
+import sys
 
 # ========================= Typehints ===============================
 profile = list[dict[str, float]]
@@ -20,6 +21,8 @@ class Node:
         self.topHits = []
         self.active = True
         self.age = 0
+        self.label = str(nodeId)
+        self.distanceToParent = 1
 
     def __lt__(self, other):
         # Used for the priority queue when determining the top hits order in case there are top hits with the same score
@@ -96,14 +99,14 @@ class Node:
 # =========================== Globals =======================================
 # Constants
 ALPHABET = 'ACGT'
-DATA_FILE = 'fasttree-input.aln'
+DATA_FILE = 'test-small.aln'
 JOIN_SAFETY_FACTOR = 2
 TOP_HITS_CLOSENESS = 0.5
 ROOT_NODE_ID = 0
 VERBOSE = True
 
 # ======================= Util functions ====================================
-def readFile(fileName: str) -> list[str]:
+def readFile(fileName: str) -> list[tuple[str, str]]:
     """
     Reads the file with the input data and parses it
     :param fileName: The name of the file to where the input data resides
@@ -112,7 +115,11 @@ def readFile(fileName: str) -> list[str]:
     with open(fileName, 'r') as file:
         rawData = file.readlines()
 
-    return [line.strip() for line in rawData if line[0] != '>']
+    data = []
+    for i in range(0, len(rawData), 2):
+        data.append((rawData[i].strip()[1:], rawData[i+1].strip()))
+
+    return data
 
 def createNewick(nodes, currentNode: int = ROOT_NODE_ID) -> str:
     """
@@ -126,10 +133,9 @@ def createNewick(nodes, currentNode: int = ROOT_NODE_ID) -> str:
     for child in currentNode.children:
         childNode = nodes[child]
         if not childNode.children:
-            # subtract 1 because our tree uses 0 for the root node and the data uses 0 for the first genome
-            output += str(child-1) + ','
+            output += childNode.label + ':' + str(childNode.distanceToParent) + ','
         else:
-            output += createNewick(nodes, childNode.nodeId) + ','
+            output += createNewick(nodes, childNode.nodeId) + ':' + str(childNode.distanceToParent) + ','
     output = output[:-1] + ')'
     return output
 
@@ -446,8 +452,12 @@ def branchLength(node1: Node, node2: Node, nodes):
 
 
 if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        user_data = sys.argv[1]
+        if user_data != '':
+            DATA_FILE = user_data
     data = readFile(DATA_FILE)
-    genomeLength = len(data[0])
+    genomeLength = len(data[0][1])
     amountOfGenomes = len(data)
 
     if VERBOSE:
@@ -457,8 +467,9 @@ if __name__ == '__main__':
     # Create initial star topology
     nodes = {ROOT_NODE_ID: Node(ROOT_NODE_ID, -1, initializeProfile('', genomeLength, ALPHABET))}
     activesNodes = []
-    for genome in data:
+    for label, genome in data:
         newNode = Node(len(nodes), ROOT_NODE_ID, initializeProfile(genome, genomeLength, ALPHABET))
+        newNode.label = label
         nodes[ROOT_NODE_ID].children.append(newNode.nodeId)
         nodes[newNode.nodeId] = newNode
         activesNodes.append(newNode.nodeId)
@@ -510,8 +521,11 @@ if __name__ == '__main__':
         activesNodes.remove(bestHit[1].nodeId)
         activesNodes.append(mergedNode.nodeId)
         nodes[mergedNode.nodeId] = mergedNode
-        nodes[mergedNode.nodeId] = mergedNode
         #update the total profile
         totalProfile = updateTotalProfile((len(activesNodes)), mergedNode.profile, totalProfile, bestHit[0].profile, bestHit[1].profile)
+
+    if VERBOSE:
+        print('performing NNI...')
+    perform_nni_rounds(nodes, len(nodes))
 
     print(createNewick(nodes))
