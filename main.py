@@ -299,37 +299,66 @@ def log_corrected_distance(profile1, profile2):
     return math.log(1 + profileDistance(profile1, profile2))
 
 
-def perform_nni(node: Node, nodes: nodeList) -> None:
+def perform_nni(node1: Node, nodes: nodeList) -> None:
     """
-    Performs the nearest neighbor interchange on a given node.
-    :param node: The node to perform NNI on.
+    Performs the nearest neighbor interchange on a given node (F1) and its parent (F2).
+    :param node: a child node (F2) to perform NNI on. will not work on root
     :param nodes: The list of all nodes.
     """
-   # Extract subtrees or leaf nodes
-    A, B = nodes[node.children[0]], nodes[node.children[1]]
-    if len(A.children) == 2 and len(B.children) == 2:
-        C, D = nodes[A.children[0]], nodes[A.children[1]]
-        E, F = nodes[B.children[0]], nodes[B.children[1]]
+    parentId = node1.parent
+    if parentId == -1:
+        print("cannot do NNI on root node")
+        return
+    
+    node2 = nodes[node1.parent]
 
-        # Calculate distances for current and alternate topologies
-        current_distance = log_corrected_distance(C.profile, D.profile) + log_corrected_distance(E.profile, F.profile)
-        alt_distance_1 = log_corrected_distance(C.profile, E.profile) + log_corrected_distance(D.profile, F.profile)
-        alt_distance_2 = log_corrected_distance(D.profile, E.profile) + log_corrected_distance(C.profile, E.profile)
+    if len(node1.children) < 2 or len(node2.children) < 2:
+        print("cannot preform NNI on leaf nodes")
+        return
+    
+    # if node1.nodeId in node2.children:
+    A, B = nodes[node1.children[0]], nodes[node1.children[1]]
 
-        # Determine if an alternate topology has a lower distance
-        if min(alt_distance_1, alt_distance_2) < current_distance:
-            if alt_distance_1 < alt_distance_2:
-                # Perform swap for the first alternate topology
-                A.children = [C.nodeId, E.nodeId]
-                B.children = [D.nodeId, F.nodeId]
+    
+    siblings = []
+    for sibling in node2.children:
+        if sibling != node1.nodeId:
+            siblings.append(sibling)
+
+    C = nodes[siblings[0]]
+    if parentId == 0:
+        D = nodes[siblings[1]]
+    else:
+        D = nodes[node2.parent]
+    
+    # Calculate distances for current and alternate topologies
+    current_distance = log_corrected_distance(A.profile, B.profile) + log_corrected_distance(C.profile, D.profile)
+    alt_distance_1 = log_corrected_distance(A.profile, C.profile) + log_corrected_distance(B.profile, D.profile)
+    alt_distance_2 = log_corrected_distance(B.profile, C.profile) + log_corrected_distance(A.profile, D.profile)
+
+    # Determine if an alternate topology has a lower distance
+    if min(alt_distance_1, alt_distance_2) < current_distance:
+        if alt_distance_1 < alt_distance_2:
+            # Perform swap for the first alternate topology
+            node1.children = [A.nodeId, C.nodeId]
+            if parentId == 0:
+                node2.children = [node1.nodeId, B.nodeId, D.nodeId]
             else:
-                # Perform swap for the second alternate topology
-                A.children = [D.nodeId, E.nodeId]
-                B.children = [C.nodeId, F.nodeId]
-
-            # Recompute profiles for affected nodes
-            A.profile = mergeProfiles(nodes[A.children[0]].profile, nodes[A.children[1]].profile)  
-            B.profile = mergeProfiles(nodes[B.children[0]].profile, nodes[B.children[1]].profile)  
+                node2.children = [node1.nodeId, B.nodeId]
+        else:
+            # Perform swap for the second alternate topology
+            node1.children = [B.nodeId, C.nodeId]
+            if parentId == 0:
+                node2.children = [node1.nodeId, A.nodeId, D.nodeId]
+            node2.children = [node1.nodeId, A.nodeId]
+        # Recompute profiles for affected nodes
+        for n in range(len(node1.children)):
+            nodes[node1.children[n]].parent = node1.nodeId
+        for n in range(len(node2.children)):
+            nodes[node2.children[n]].parent = node2.nodeId
+        node1.profile = mergeProfiles(nodes[node1.children[0]].profile, nodes[node1.children[1]].profile)
+        if parentId != 0:
+            node2.profile = mergeProfiles(nodes[node2.children[0]].profile, nodes[node2.children[1]].profile)  
 
 
 def perform_nni_rounds(nodes: nodeList, rounds: int) -> None:
@@ -341,10 +370,7 @@ def perform_nni_rounds(nodes: nodeList, rounds: int) -> None:
     for _ in range(rounds):
         for node_id, node in nodes.items():
             if len(node.children) == 2:  # Ensure it's an internal node with two children
-                perform_nni(node, nodes)
-
-
-
+                perform_nni(node, node.parent, nodes)
 
 
 # =============================== Algorithm =======================================
