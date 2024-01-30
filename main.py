@@ -338,10 +338,10 @@ def findBestJoin(topHits: topHitsList):
 
     return bestCandidate
 
-def log_corrected_distance(profile1, profile2):
+def log_corrected_distance(node1, node2):
     # Implement the log-corrected distance calculation between two profiles
-    # This is a simplified placeholder; you'll need to implement the actual calculation
-    return math.log(1 + profileDistance(profile1, profile2))
+
+    return -1.3 * math.log(1 - nodeDistance(node1, node2))
 
 
 def perform_nni(node1: Node, nodes: nodeList) -> None:
@@ -376,9 +376,9 @@ def perform_nni(node1: Node, nodes: nodeList) -> None:
         D = nodes[node2.parent]
     
     # Calculate distances for current and alternate topologies
-    current_distance = log_corrected_distance(A.profile, B.profile) + log_corrected_distance(C.profile, D.profile)
-    alt_distance_1 = log_corrected_distance(A.profile, C.profile) + log_corrected_distance(B.profile, D.profile)
-    alt_distance_2 = log_corrected_distance(B.profile, C.profile) + log_corrected_distance(A.profile, D.profile)
+    current_distance = log_corrected_distance(A, B) + log_corrected_distance(C, D)
+    alt_distance_1 = log_corrected_distance(A, C) + log_corrected_distance(B, D)
+    alt_distance_2 = log_corrected_distance(B, C) + log_corrected_distance(A, D)
 
     # Determine if an alternate topology has a lower distance
     if min(alt_distance_1, alt_distance_2) < current_distance:
@@ -417,6 +417,29 @@ def perform_nni_rounds(nodes: nodeList, rounds: int) -> None:
         for node_id, node in nodes.items():
             if len(node.children) == 2 and node_id != 0:  # Ensure it's an internal node with two children (not root)
                 perform_nni(node, nodes)
+
+def branchLength(node1: Node, node2: Node, nodes):
+    if len(node1.children) or len(node2.children) == 0:
+        if node1.children == 0:
+            node1 = node1
+            node2 = nodes[node2.children[0]]
+            node3 = nodes[node2.children[1]]
+            branchLength = (log_corrected_distance(node1, node2) + log_corrected_distance(node1, node3) -
+                             log_corrected_distance(node2, node3))/2
+        else:
+            node1 = node2
+            node2 = nodes[node1.children[0]]
+            node3 = nodes[node1.children[1]]
+            branchLength = (log_corrected_distance(node1, node2) + log_corrected_distance(node1, node3) -
+                            log_corrected_distance(node2, node3)) / 2
+    else:
+        node1 = nodes[node1.children[0]]
+        node2 = nodes[node1.children[1]]
+        node3 = nodes[node2.children[0]]
+        node4 = nodes[node2.children[1]]
+        branchLength = (log_corrected_distance(node1, node3) + log_corrected_distance(node1, node4) +
+                        log_corrected_distance(node2, node3) + log_corrected_distance(node2, node4)) / 4
+    return branchLength
 
 
 # =============================== Algorithm =======================================
