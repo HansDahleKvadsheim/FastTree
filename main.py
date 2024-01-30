@@ -424,25 +424,18 @@ def perform_nni_rounds(nodes: nodeList, rounds: int) -> None:
             if len(node.children) == 2 and node_id != 0:  # Ensure it's an internal node with two children (not root)
                 perform_nni(node, nodes)
 
-def branchLength(node1: Node, node2: Node, nodes):
-    if len(node1.children) or len(node2.children) == 0:
-        if node1.children == 0:
-            node1 = node1
-            node2 = nodes[node2.children[0]]
-            node3 = nodes[node2.children[1]]
-            branchLength = (log_corrected_distance(node1, node2) + log_corrected_distance(node1, node3) -
-                             log_corrected_distance(node2, node3))/2
-        else:
-            node1 = node2
-            node2 = nodes[node1.children[0]]
-            node3 = nodes[node1.children[1]]
-            branchLength = (log_corrected_distance(node1, node2) + log_corrected_distance(node1, node3) -
+def branchLength(parent: Node, child: Node, nodes):
+    if len(child.children) == 0:
+        node1 = child
+        node2 = nodes[parent.children[0]]
+        node3 = nodes[parent.children[1]]
+        branchLength = (log_corrected_distance(node1, node2) + log_corrected_distance(node1, node3) -
                             log_corrected_distance(node2, node3)) / 2
     else:
-        node1 = nodes[node1.children[0]]
-        node2 = nodes[node1.children[1]]
-        node3 = nodes[node2.children[0]]
-        node4 = nodes[node2.children[1]]
+        node1 = nodes[parent.children[0]]
+        node2 = nodes[parent.children[1]]
+        node3 = nodes[child.children[0]]
+        node4 = nodes[child.children[1]]
         branchLength = (log_corrected_distance(node1, node3) + log_corrected_distance(node1, node4) +
                         log_corrected_distance(node2, node3) + log_corrected_distance(node2, node4)) / 4
     return branchLength
@@ -529,3 +522,10 @@ if __name__ == '__main__':
     perform_nni_rounds(nodes, len(nodes))
 
     print(createNewick(nodes))
+    print(nodes[9].children)
+    print(nodes[12].children)
+    print(profileDistance(nodes[12].profile, nodes[9].profile))
+    print(nodes[9].upDistance)
+    print(nodes[12].upDistance)
+    print(nodeDistance(nodes[9], nodes[12]))
+    print(branchLength(nodes[9], nodes[12], nodes))
