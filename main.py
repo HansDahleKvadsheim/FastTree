@@ -42,12 +42,13 @@ class Node:
             currentNode = nodes[currentNode.parent]
         return currentNode.nodeId
 
-    def initialize_top_hits(self, nodes: nodeList, active_nodes: list[int], m: int) -> topHitsList:
+    def initialize_top_hits(self, nodes: nodeList, active_nodes: list[int], m: int, totalProfile: profile) -> topHitsList:
         """
         Initializes the top hits list for this node
         :param nodes:   The list of all nodes
         :param active_nodes:    The list of current active nodes
         :param m:   m
+        :param totalProfile: The average profile of all active nodes
         :return: The list of top hits for this node
         """
         # Keep a list of top hits for this sequence
@@ -57,7 +58,10 @@ class Node:
             if nodeId == self.nodeId:
                 continue
             seq = nodes[nodeId]
-            score = profileDistance(self.profile, seq.profile)
+            # we are only calculating the distance now, not the criterion that should be minimized
+            # criterion = d_u(i,j) - r(i) - r(j)
+            score = nodeDistance((self.profile, seq.profile) - profileDistance(self.profile, totalProfile)
+                     - profileDistance(seq.profile, totalProfile))
             top_hits.append((nodeId, score))
 
         # Sort based on score
@@ -76,6 +80,7 @@ class Node:
 
         top_hits.sort(key=lambda x: x[1])
         self.topHits = top_hits[:m]
+
 
 
 # =========================== Globals =======================================
@@ -144,20 +149,32 @@ def computeTotalProfile(nodes: dict[int: Node]) -> profile:
 
     return totalProfile
 
-def updateTotalProfile(amountOfTerms: int, newProfile: profile, totalProfile: profile) -> profile:
+def updateTotalProfile(amountOfTerms: int, newProfile, totalProfile, oldProfile1=None, oldProfile2=None) -> profile:
     """
-    Updates the total profile with the new profile
+    Updates the total profile with the new profile and optionally deletes old profiles.
     :param amountOfTerms: The amount of profiles which have been used to compute the total so far
     :param newProfile: The new profile to update the total profile with
     :param totalProfile: The current total profile
+    :param oldProfile1: Old profile to remove (optional)
+    :param oldProfile2: Old profile to remove (optional)
     :return: The updated total profile
     """
     genomeLength = len(newProfile)
+    # If the old inactive nodes need to be removed
+    if oldProfile1 and oldProfile2:
+        for i in range(genomeLength):
+            for key in totalProfile[i]:
+                totalProfile[i][key] = totalProfile[i][key] + ((newProfile[i][key] - totalProfile[i][key]) - (
+                    oldProfile1[i][key] - totalProfile[i][key]) - (oldProfile2[i][key] - totalProfile[i][key])) / (
+                    3 * amountOfTerms)
+    else:
+        for i in range(genomeLength):
+            for key in totalProfile[i]:
+                totalProfile[i][key] = totalProfile[i][key] + (newProfile[i][key] - totalProfile[i][key]) / (
+                    amountOfTerms)
 
-    for i in range(genomeLength):
-        for key in totalProfile[i]:
-            totalProfile[i][key] = totalProfile[i][key] + (newProfile[i][key] - totalProfile[i][key]) / amountOfTerms
     return totalProfile
+
 
 def mergeProfiles(profile1: profile, profile2: profile) -> profile:
     """
@@ -287,6 +304,7 @@ def findBestJoin(topHits: topHitsList):
         node = hit[1].findActiveAncestor()
         node.age += 1
         distance = hit[1]
+
         if distance < bestCriterion:
             bestCandidate = node
             bestCriterion = distance
@@ -329,17 +347,18 @@ if __name__ == '__main__':
                     q.put((topHit[1], nodeId1, nodeId2))    #  (Distance, node from, node to)
 
         # Get the best m hits over all nodes
-        toppesthits = []
+        toppestHits = []
         for _ in range(m):
-            toppesthits.append(q.get())
+            toppestHits.append(q.get())
 
         # Compute the score for all best hits and take the best one
         bestHit = None
         bestValue = float('inf')
-        for _, nodeFrom, nodeTo in toppesthits:
+        for _, nodeFrom, nodeTo in toppestHits:
             node1 = nodes[nodeFrom]
             node2 = nodes[nodeTo]
-            score = nodeDistance(node1, node2)
+            score = nodeDistance(node1, node2) - profileDistance(node1.profile, totalProfile) - (
+                profileDistance(node2.profile, totalProfile))
             if score < bestValue:
                 bestHit = (node1, node2)
                 bestValue = score
@@ -350,3 +369,6 @@ if __name__ == '__main__':
         activesNodes.remove(bestHit[1].nodeId)
         activesNodes.append(mergedNode.nodeId)
         nodes[mergedNode.nodeId] = mergedNode
+
+        #update the total profile
+        totalProfile = updateTotalProfile((len(activesNodes)), mergedNode.profile, totalProfile, bestHit[0].profile, bestHit[1].profile)
