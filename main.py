@@ -149,7 +149,7 @@ def computeTotalProfile(nodes: dict[int: Node]) -> profile:
 
     return totalProfile
 
-def updateTotalProfile(amountOfTerms: int, newProfile, totalProfile, oldProfile1=None, oldProfile2=None) -> profile:
+def updateTotalProfile(amountOfTerms: int, newProfile, totalProfile, oldProfile1, oldProfile2) -> profile:
     """
     Updates the total profile with the new profile and optionally deletes old profiles.
     :param amountOfTerms: The amount of profiles which have been used to compute the total so far
@@ -161,17 +161,11 @@ def updateTotalProfile(amountOfTerms: int, newProfile, totalProfile, oldProfile1
     """
     genomeLength = len(newProfile)
     # If the old inactive nodes need to be removed
-    if oldProfile1 and oldProfile2:
-        for i in range(genomeLength):
-            for key in totalProfile[i]:
-                totalProfile[i][key] = totalProfile[i][key] + ((newProfile[i][key] - totalProfile[i][key]) - (
-                    oldProfile1[i][key] - totalProfile[i][key]) - (oldProfile2[i][key] - totalProfile[i][key])) / (
-                    3 * amountOfTerms)
-    else:
-        for i in range(genomeLength):
-            for key in totalProfile[i]:
-                totalProfile[i][key] = totalProfile[i][key] + (newProfile[i][key] - totalProfile[i][key]) / (
-                    amountOfTerms)
+    for i in range(genomeLength):
+        for key in totalProfile[i]:
+            totalProfile[i][key] = ((totalProfile[i][key] * amountOfTerms) - oldProfile1[i][key]) / (amountOfTerms - 1)
+            totalProfile[i][key] = ((totalProfile[i][key] * (amountOfTerms-1)) - oldProfile2[i][key]) / (amountOfTerms - 2)
+            totalProfile[i][key] = totalProfile[i][key] + (newProfile[i][key] - totalProfile[i][key]) / (amountOfTerms - 1)
 
     return totalProfile
 

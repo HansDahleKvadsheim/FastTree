@@ -161,7 +161,7 @@ class TestFasttreeMethods(unittest.TestCase):
         ]
         self.assertEqual(expectedProfile, main.computeTotalProfile(nodes))
 
-    def testUpdateTotalProfile(self):
+    def testUpdateTotalProfileWithoutMerge(self):
         totalProfile = [
             {'A': 0.5, 'C': 0, 'G': 0, 'T': 0.5},
             {'A': 1, 'C': 0, 'G': 0, 'T': 0},
@@ -176,6 +176,32 @@ class TestFasttreeMethods(unittest.TestCase):
             {'A': 0.0, 'C': 0.0, 'G': 0.0, 'T': 1.0}
         ]
         totalProfile = main.updateTotalProfile(3, newProfile, totalProfile)
+        for i in range(4):
+            for c in 'ACGT':
+                self.assertAlmostEqual(expectedProfile[i][c], totalProfile[i][c])
+
+    def testUpdateTotalProfileWithMerge(self):
+        totalProfile = [
+            {'A': 1/3, 'C': 0, 'G': 0, 'T': 2/3},
+            {'A': 2/3, 'C': 1/3, 'G': 0, 'T': 0},
+            {'A': 1/3, 'C': 1/3, 'G': 0, 'T': 1/3},
+            {'A': 0, 'C': 1/3, 'G': 0, 'T': 2/3}
+        ]
+        oldProfile1 = main.initializeProfile('AACT', 4, 'ACGT')
+        oldProfile2 = main.initializeProfile('TATT', 4, 'ACGT')
+        mergedProfile = [
+            {'A': 0.5, 'C': 0, 'G': 0, 'T': 0.5},
+            {'A': 1, 'C': 0, 'G': 0, 'T': 0},
+            {'A': 0, 'C': 0.5, 'G': 0, 'T': 0.5},
+            {'A': 0, 'C': 0, 'G': 0, 'T': 1}
+        ]
+        expectedProfile = [
+            {'A': 0.25, 'C': 0, 'G': 0, 'T': 0.75},
+            {'A': 0.5, 'C': 0.5, 'G': 0, 'T': 0},
+            {'A': 0.5, 'C': 0.25, 'G': 0, 'T': 0.25},
+            {'A': 0, 'C': 0.5, 'G': 0, 'T': 0.5}
+        ]
+        totalProfile = main.updateTotalProfile(3, mergedProfile, totalProfile, oldProfile1, oldProfile2)
         for i in range(4):
             for c in 'ACGT':
                 self.assertAlmostEqual(expectedProfile[i][c], totalProfile[i][c])
