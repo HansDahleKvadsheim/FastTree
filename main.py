@@ -98,7 +98,7 @@ class Node:
 # =========================== Globals =======================================
 # Constants
 ALPHABET = 'ACGT'
-DATA_FILE = 'test_small.aln'
+DATA_FILE = 'test-small.aln'
 JOIN_SAFETY_FACTOR = 2
 TOP_HITS_CLOSENESS = 0.5
 ROOT_NODE_ID = 0
@@ -428,9 +428,10 @@ def perform_nni_rounds(nodes: nodeList, rounds: int) -> None:
 
 
 if __name__ == '__main__':
-    user_data = sys.argv[1]
-    if user_data != '':
-        DATA_FILE = user_data
+    if len(sys.argv) > 1:
+        user_data = sys.argv[1]
+        if user_data != '':
+            DATA_FILE = user_data
     data = readFile(DATA_FILE)
     genomeLength = len(data[0][1])
     amountOfGenomes = len(data)
