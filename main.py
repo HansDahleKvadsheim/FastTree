@@ -496,6 +496,8 @@ def branchLength(parent: Node, child: Node, nodes):
     #In case the child node is a leaf. (Parent node will never be a leaf)
     if len(child.children) == 0:
         nodeA = child
+        if parent.parent < 0:
+            return 0
         nodeR = nodes[parent.parent]
         nodeB = nodes[[c for c in parent.children if c != child.nodeId][0]]
         branchLength = (log_corrected_distance(nodeA, nodeR) + log_corrected_distance(nodeA, nodeB) -
@@ -604,7 +606,7 @@ if __name__ == '__main__':
 
     branchLengths = []
     for node in nodes:
-        if node == 0:
+        if nodes[node].parent <0:
             branchLengths.append((node, node, 0))
             nodes[node].distanceToParent = 0
         else:
