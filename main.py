@@ -63,7 +63,7 @@ class Node:
             seq = nodes[nodeId]
             # we are only calculating the distance now, not the criterion that should be minimized
             # criterion = d_u(i,j) - r(i) - r(j)
-            score = nodeDistance(self, seq) - calculateOutDistance(self, activesNodes, nodes, totalProfile) - calculateOutDistance(seq, activesNodes, nodes, totalProfile)
+            score = nodeDistance(self, seq) - calculateOutDistance(self, active_nodes, nodes, totalProfile) - calculateOutDistance(seq, active_nodes, nodes, totalProfile)
             top_hits.append((nodeId, score))
 
         # Sort based on score
@@ -118,7 +118,7 @@ class Node:
         combinedTophits = []
         for child in combinedList:
             node = nodes[child[0]]
-            score = nodeDistance(node.profile, self.profile) - calculateOutDistance(self, activesNodes, nodes, totalProfile) - calculateOutDistance(node, activesNodes, nodes, totalProfile)
+            score = nodeDistance(node, self) - calculateOutDistance(self, activesNodes, nodes, totalProfile) - calculateOutDistance(node, activesNodes, nodes, totalProfile)
             combinedTophits.append((child[0], score))
 
         combinedTophits.sort(key=lambda x: x[1])
@@ -136,7 +136,7 @@ TOP_HITS_CLOSENESS = 0.5
 ROOT_NODE_ID = 0
 VERBOSE = True
 REFRESH_FACTOR = 0.8
-MAX_AGE = 5
+MAX_AGE = 3
 
 # ======================= Util functions ====================================
 def readFile(fileName: str) -> list[str]:
@@ -293,13 +293,11 @@ def calculateOutDistance(node: Node, activesNodes: list[int], nodes: nodeList, t
     sum = 0
     n = len(activesNodes)
     for j in activesNodes:
-        if nodes[j] != node:
-            sum += nodeDistance(node, nodes[j])
-    return sum/(n-2)
+        sum += nodes[j].upDistance
 
-    # outDistance = n*profileDistance(node.profile, totalProfile) - profileDistance(node.profile, node.profile) \
-    # - (n-1)*node.upDistance + node.upDistance - sum
-    # return outDistance/(n-2)
+    outDistance = n*profileDistance(node.profile, totalProfile) - profileDistance(node.profile, node.profile) \
+    - (n-1)*node.upDistance + node.upDistance - sum
+    return outDistance/(n-2)
 
 
 def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList) -> Node:
@@ -390,7 +388,6 @@ def refresh_top_hits(node: Node, m: int, nodes: nodeList, activesNodes: list[int
     for neighbour, _ in top_hits[:m]:
         neighbourNode = nodes[neighbour]
         neighbourNode.merge_top_hits(top_hits, m, nodes, totalProfile)
-
 
 def findBestJoin(topHits: topHitsList):
     bestCandidate = None
