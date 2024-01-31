@@ -139,7 +139,6 @@ TOP_HITS_CLOSENESS = 0.5
 ROOT_NODE_ID = 0
 VERBOSE = True
 REFRESH_FACTOR = 0.8
-MAX_AGE = 3
 
 # ======================= Util functions ====================================
 def readFile(fileName: str) -> list[tuple[str, str]]:
@@ -547,6 +546,7 @@ if __name__ == '__main__':
 
     # create initial top Hits
     m = math.ceil(amountOfGenomes ** 0.5)
+    max_age = int(1 + math.log2(m))
     if VERBOSE:
         print('initializing top hits...')
     initialize_top_hits(m, nodes, activesNodes, totalProfile)
@@ -589,7 +589,7 @@ if __name__ == '__main__':
         nodes[node.nodeId] = node
         #update the total profile
         totalProfile = updateTotalProfile((len(activesNodes)), node.profile, totalProfile, bestHit[0].profile, bestHit[1].profile)
-        if ((len(node.topHits) <= REFRESH_FACTOR*m or node.age >= MAX_AGE)) :
+        if ((len(node.topHits) <= REFRESH_FACTOR*m or node.age >= max_age)) :
             if VERBOSE:
                 print('Refreshing node {}...'.format(node.nodeId))
                 refresh_top_hits(node, min(m, len(activesNodes)-1), nodes, activesNodes, totalProfile)
