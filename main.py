@@ -96,7 +96,7 @@ class Node:
         self.topHits = top_hits[:m]
     
 
-    def merge_top_hits(self, seed_top_hits: topHitsList, m: int, nodes: nodeList, totalProfile: profile) -> None:
+    def merge_top_hits(self, seed_top_hits: topHitsList, m: int, nodes: nodeList, activesNodes: list[int], totalProfile: profile) -> None:
         """
         Approximates a new top hits list for this node based on the top hits list from a seed and an allready existing topHits
         :param seed_top_hits: The top hits from the seeds
@@ -307,7 +307,7 @@ def calculateOutDistance(node: Node, activesNodes: list[int], nodes: nodeList, t
 
 
 
-def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList) -> Node:
+def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList, totalProfile: profile) -> Node:
     """
     Takes two nodes and combines them according to the fast tree algorithm
     :param node1: First node to merge
@@ -339,11 +339,12 @@ def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList) -> Node:
 
     #Combine top Hits list and remove duplicates
     combinedList = list(dict.fromkeys(node1_topHits + node2_topHits))
-
+    nodes[newNode.nodeId] = newNode
     combinedTophits = []
+    active_nodes = nodes[ROOT_NODE_ID].children
     for child in combinedList:
         node = nodes[child[0]]
-        score = nodeDistance(node, newNode) -calculateOutDistance(node, activesNodes, nodes, totalProfile) - calculateOutDistance(newNode, activesNodes,nodes,  totalProfile)
+        score = nodeDistance(node, newNode) -calculateOutDistance(node, active_nodes, nodes, totalProfile) - calculateOutDistance(newNode, active_nodes, nodes,  totalProfile)
         combinedTophits.append((child[0], score))
 
     combinedTophits.sort(key=lambda x: x[1])
@@ -394,7 +395,7 @@ def refresh_top_hits(node: Node, m: int, nodes: nodeList, activesNodes: list[int
     top_hits = node.initialize_top_hits(nodes, activesNodes, m, totalProfile)
     for neighbour, _ in top_hits[:m]:
         neighbourNode = nodes[neighbour]
-        neighbourNode.merge_top_hits(top_hits, m, nodes, totalProfile)
+        neighbourNode.merge_top_hits(top_hits, m, nodes, activesNodes, totalProfile)
     node.age = 0
 
 def findBestJoin(topHits: topHitsList):
@@ -581,11 +582,10 @@ if __name__ == '__main__':
             print('>> joining nodes {} and {}...'.format(bestHit[0].nodeId, bestHit[1].nodeId))
 
         # Merge the nodes
-        node = mergeNodes(bestHit[0], bestHit[1], m, nodes)
+        node = mergeNodes(bestHit[0], bestHit[1], m, nodes, totalProfile)
         activesNodes.remove(bestHit[0].nodeId)
         activesNodes.remove(bestHit[1].nodeId)
         activesNodes.append(node.nodeId)
-        nodes[node.nodeId] = node
         nodes[node.nodeId] = node
         #update the total profile
         totalProfile = updateTotalProfile((len(activesNodes)), node.profile, totalProfile, bestHit[0].profile, bestHit[1].profile)
