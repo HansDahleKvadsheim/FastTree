@@ -99,7 +99,7 @@ class Node:
 # =========================== Globals =======================================
 # Constants
 ALPHABET = 'ACGT'
-DATA_FILE = 'test-small.aln'
+DATA_FILE = 'fasttree-input.aln'
 JOIN_SAFETY_FACTOR = 2
 TOP_HITS_CLOSENESS = 0.5
 ROOT_NODE_ID = 0
@@ -429,19 +429,19 @@ def perform_nni_rounds(nodes: nodeList, rounds: int) -> None:
 def branchLength(parent: Node, child: Node, nodes):
     #In case the child node is a leaf. (Parent node will never be a leaf)
     if len(child.children) == 0:
-        node1 = child
-        node2 = nodes[parent.children[0]]
-        node3 = nodes[parent.children[1]]
-        branchLength = (log_corrected_distance(node1, node2) + log_corrected_distance(node1, node3) -
-                        log_corrected_distance(node2, node3)) / 2
+        nodeA = child
+        nodeR = nodes[parent.parent]
+        nodeB = nodes[[c for c in parent.children if c != child.nodeId][0]]
+        branchLength = (log_corrected_distance(nodeA, nodeR) + log_corrected_distance(nodeA, nodeB) -
+                        log_corrected_distance(nodeB, nodeR)) / 2
     else:
-        node1 = nodes[parent.children[0]]
-        node2 = nodes[parent.children[1]]
-        node3 = nodes[child.children[0]]
-        node4 = nodes[child.children[1]]
-        branchLength = (log_corrected_distance(node1, node3) + log_corrected_distance(node1, node4) +
-                        log_corrected_distance(node2, node3) + log_corrected_distance(node2, node4)) / 4 - (
-                        log_corrected_distance(node1, node2) + log_corrected_distance(node3, node4)) / 2
+        nodeA = nodes[child.children[0]]
+        nodeB = nodes[child.children[1]]
+        nodeR = parent
+        nodeC = nodes[[c for c in nodeR.children if c != child.nodeId][0]]
+        branchLength = (log_corrected_distance(nodeA, nodeR) + log_corrected_distance(nodeA, nodeC) +
+                        log_corrected_distance(nodeB, nodeR) + log_corrected_distance(nodeB, nodeC)) / 4 - (
+                        log_corrected_distance(nodeA, nodeB) + log_corrected_distance(nodeR, nodeC)) / 2
 
     return branchLength
 
