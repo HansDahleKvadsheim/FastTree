@@ -596,7 +596,7 @@ if __name__ == '__main__':
 
     if VERBOSE:
         print('performing NNI...')
-    perform_nni_rounds(nodes, len(nodes))
+    perform_nni_rounds(nodes, math.ceil(math.log2(len(nodes)) + 1))
 
 
     if VERBOSE:
