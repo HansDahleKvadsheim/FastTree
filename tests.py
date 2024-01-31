@@ -25,6 +25,10 @@ class TestFasttreeMethods(unittest.TestCase):
         profile1 = main.initializeProfile('ACGTTT', 6, 'ACGT')
         profile2 = main.initializeProfile('AGTCAT', 6, 'ACGT')
         self.assertEqual(4 / 6, main.profileDistance(profile1, profile2))
+        # Example from the paper
+        profile3 = [{'A': 0.6, 'C': 0.4, 'G': 0, 'T': 0}]
+        profile4 = [{'A': 0.5, 'C': 0, 'G': 0.5, 'T': 0}]
+        self.assertEqual(0.7, main.profileDistance(profile3, profile4))
 
     def testComputeUpDistance(self):
         nodes = {
