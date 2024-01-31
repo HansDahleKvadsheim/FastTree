@@ -253,6 +253,8 @@ def calculateUpDistance(node: Node, nodes: nodeList) -> float:
     node2 = nodes[node.children[1]]
     return profileDistance(node1.profile, node2.profile) / 2
 
+
+
 def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList) -> Node:
     """
     Takes two nodes and combines them according to the fast tree algorithm
@@ -346,8 +348,8 @@ def findBestJoin(topHits: topHitsList):
 
 def log_corrected_distance(node1, node2):
     # Implement the log-corrected distance calculation between two profiles
-
-    return -1.3 * math.log(1 - nodeDistance(node1, node2))
+    val = -1.3 * math.log(1 - profileDistance(node1.profile, node2.profile))
+    return val
 
 
 def perform_nni(node1: Node, nodes: nodeList) -> None:
@@ -425,19 +427,22 @@ def perform_nni_rounds(nodes: nodeList, rounds: int) -> None:
                 perform_nni(node, nodes)
 
 def branchLength(parent: Node, child: Node, nodes):
+    #In case the child node is a leaf. (Parent node will never be a leaf)
     if len(child.children) == 0:
         node1 = child
         node2 = nodes[parent.children[0]]
         node3 = nodes[parent.children[1]]
         branchLength = (log_corrected_distance(node1, node2) + log_corrected_distance(node1, node3) -
-                            log_corrected_distance(node2, node3)) / 2
+                        log_corrected_distance(node2, node3)) / 2
     else:
         node1 = nodes[parent.children[0]]
         node2 = nodes[parent.children[1]]
         node3 = nodes[child.children[0]]
         node4 = nodes[child.children[1]]
         branchLength = (log_corrected_distance(node1, node3) + log_corrected_distance(node1, node4) +
-                        log_corrected_distance(node2, node3) + log_corrected_distance(node2, node4)) / 4
+                        log_corrected_distance(node2, node3) + log_corrected_distance(node2, node4)) / 4 - (
+                        log_corrected_distance(node1, node2) + log_corrected_distance(node3, node4)) / 2
+
     return branchLength
 
 
@@ -521,11 +526,24 @@ if __name__ == '__main__':
         print('performing NNI...')
     perform_nni_rounds(nodes, len(nodes))
 
+
+    branchLengths = []
+    for node in nodes:
+        if node == 0:
+            branchLengths.append((node, node, 0))
+            nodes[node].distanceToParent = 0
+        else:
+            parent = nodes[nodes[node].parent]
+            branchLengths.append((node, parent.nodeId, branchLength(parent, nodes[node], nodes)))
+            nodes[node].distanceToParent = branchLength(parent, nodes[node], nodes)
+
+    print(branchLengths)
     print(createNewick(nodes))
-    print(nodes[9].children)
-    print(nodes[12].children)
-    print(profileDistance(nodes[12].profile, nodes[9].profile))
-    print(nodes[9].upDistance)
-    print(nodes[12].upDistance)
-    print(nodeDistance(nodes[9], nodes[12]))
-    print(branchLength(nodes[9], nodes[12], nodes))
+
+    # print(nodes[9].children)
+    # print(nodes[12].children)
+    # print(profileDistance(nodes[12].profile, nodes[9].profile))
+    # print(nodes[9].upDistance)
+    # print(nodes[12].upDistance)
+    # print(nodeDistance(nodes[9], nodes[12]))
+    # print(branchLength(nodes[9], nodes[12], nodes))

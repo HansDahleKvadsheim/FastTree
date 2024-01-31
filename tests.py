@@ -22,9 +22,20 @@ class TestFasttreeMethods(unittest.TestCase):
         self.assertEqual(targetProfile, main.initializeProfile('', 4, 'ACGT'))
 
     def testComputeProfileDistance(self):
-        profile1 = main.initializeProfile('ACGTTT', 6, 'ACGT')
-        profile2 = main.initializeProfile('AGTCAT', 6, 'ACGT')
-        self.assertEqual(4 / 6, main.profileDistance(profile1, profile2))
+        profile1 = targetProfile = [
+            {'A': 1, 'C': 0, 'G': 0, 'T': 0},
+            {'A': 0, 'C': 1, 'G': 0, 'T': 0},
+            {'A': 0, 'C': 0, 'G': 1, 'T': 0},
+            {'A': 0, 'C': 0, 'G': 0, 'T': 1}]
+
+        profile2 = targetProfile = [
+            {'A': 0, 'C': 1, 'G': 0, 'T': 0},
+            {'A': 0, 'C': 0, 'G': 1, 'T': 0},
+            {'A': 0, 'C': 0, 'G': 0, 'T': 1},
+            {'A': 1, 'C': 0, 'G': 0, 'T': 0}]
+
+
+        self.assertEqual(1, main.profileDistance(profile1, profile2))
 
     def testComputeUpDistance(self):
         nodes = {
