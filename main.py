@@ -394,6 +394,7 @@ def refresh_top_hits(node: Node, m: int, nodes: nodeList, activesNodes: list[int
     for neighbour, _ in top_hits[:m]:
         neighbourNode = nodes[neighbour]
         neighbourNode.merge_top_hits(top_hits, m, nodes, totalProfile)
+    node.age = 0
 
 def findBestJoin(topHits: topHitsList):
     bestCandidate = None

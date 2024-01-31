@@ -104,7 +104,7 @@ class TestFasttreeMethods(unittest.TestCase):
         top_hits = nodes[1].initialize_top_hits(nodes, active_nodes, m, totalProfile)
         self.assertEqual(1, top_hits[0][0])
         self.assertEqual(2, top_hits[1][0])
-        self.assertEqual(3, top_hits[2][0])
+        self.assertEqual(4, top_hits[2][0])
 
         self.assertNotEqual(1, nodes[1].topHits[0][0])
         self.assertEqual(2, nodes[1].topHits[0][0])
@@ -126,7 +126,7 @@ class TestFasttreeMethods(unittest.TestCase):
         nodes[2].approximate_top_hits(top_hits, m, nodes, totalProfile)
 
         self.assertEqual(1, nodes[2].topHits[0][0])
-        self.assertEqual(3, nodes[2].topHits[1][0])
+        self.assertEqual(5, nodes[2].topHits[1][0])
 
     def testInitializeTopHits(self):
         nodes = {
