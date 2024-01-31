@@ -196,7 +196,21 @@ class TestFasttreeMethods(unittest.TestCase):
         for i in range(4):
             for c in 'ACGT':
                 self.assertAlmostEqual(expectedProfile[i][c], totalProfile[i][c])
+    def testBranchLengths(self):
 
+        nodes = {
+            0: main.Node(0, -1, main.initializeProfile('', 4, 'ACGT')),
+            1: main.Node(1, 0, profile=main.initializeProfile('ACGT', 4, 'ACGT')),
+            2: main.Node(2, 0, profile=main.initializeProfile('ACGT', 4, 'ACGT')),
+            3: main.Node(3, 0, profile=main.initializeProfile('ACGA', 4, 'ACGT')),
+            4: main.Node(4, 0, profile=main.initializeProfile('ACGA', 4, 'ACGT'))
+        }
+        nodes[0].children = [1, 2, 3, 4]
+        node5 = main.mergeNodes(nodes[1], nodes[2], 2, nodes)
+        nodes[node5.nodeId] = node5
+        node6 = main.mergeNodes(nodes[3], nodes[4], 2, nodes)
+        nodes[node6.nodeId] = node6
+        print(main.branchLength(node5, node6, nodes))
 class TestNNIFunctions(unittest.TestCase):
 
     def setUp(self):

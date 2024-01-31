@@ -306,6 +306,8 @@ def calculateOutDistance(node: Node, activesNodes: list[int], nodes: nodeList, t
     return outDistance/(n-2)
 
 
+
+
 def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList) -> Node:
     """
     Takes two nodes and combines them according to the fast tree algorithm
@@ -410,9 +412,10 @@ def findBestJoin(topHits: topHitsList):
 
     return bestCandidate
 
-def log_corrected_distance(profile1, profile2):
-    # This is a simplified placeholder; We'll need to implement the actual calculation
-    return math.log(1 + profileDistance(profile1, profile2))
+def log_corrected_distance(node1, node2):
+    # Implement the log-corrected distance calculation between two profiles
+    val = -1.3 * math.log(1 - profileDistance(node1.profile, node2.profile))
+    return val
 
 
 def perform_nni(node1: Node, nodes: nodeList) -> None:
@@ -447,9 +450,9 @@ def perform_nni(node1: Node, nodes: nodeList) -> None:
         D = nodes[node2.parent]
     
     # Calculate distances for current and alternate topologies
-    current_distance = log_corrected_distance(A.profile, B.profile) + log_corrected_distance(C.profile, D.profile)
-    alt_distance_1 = log_corrected_distance(A.profile, C.profile) + log_corrected_distance(B.profile, D.profile)
-    alt_distance_2 = log_corrected_distance(B.profile, C.profile) + log_corrected_distance(A.profile, D.profile)
+    current_distance = log_corrected_distance(A, B) + log_corrected_distance(C, D)
+    alt_distance_1 = log_corrected_distance(A, C) + log_corrected_distance(B, D)
+    alt_distance_2 = log_corrected_distance(B, C) + log_corrected_distance(A, D)
 
     # Determine if an alternate topology has a lower distance
     if min(alt_distance_1, alt_distance_2) < current_distance:
@@ -488,6 +491,25 @@ def perform_nni_rounds(nodes: nodeList, rounds: int) -> None:
         for node_id, node in nodes.items():
             if len(node.children) == 2 and node_id != 0:  # Ensure it's an internal node with two children (not root)
                 perform_nni(node, nodes)
+
+def branchLength(parent: Node, child: Node, nodes):
+    #In case the child node is a leaf. (Parent node will never be a leaf)
+    if len(child.children) == 0:
+        nodeA = child
+        nodeR = nodes[parent.parent]
+        nodeB = nodes[[c for c in parent.children if c != child.nodeId][0]]
+        branchLength = (log_corrected_distance(nodeA, nodeR) + log_corrected_distance(nodeA, nodeB) -
+                        log_corrected_distance(nodeB, nodeR)) / 2
+    else:
+        nodeA = nodes[child.children[0]]
+        nodeB = nodes[child.children[1]]
+        nodeR = parent
+        nodeC = nodes[[c for c in nodeR.children if c != child.nodeId][0]]
+        branchLength = (log_corrected_distance(nodeA, nodeR) + log_corrected_distance(nodeA, nodeC) +
+                        log_corrected_distance(nodeB, nodeR) + log_corrected_distance(nodeB, nodeC)) / 4 - (
+                        log_corrected_distance(nodeA, nodeB) + log_corrected_distance(nodeR, nodeC)) / 2
+
+    return branchLength if branchLength >= 0 else 0
 
 
 
@@ -572,6 +594,23 @@ if __name__ == '__main__':
                 print('Refreshing node {}...'.format(node.nodeId))
                 refresh_top_hits(node, min(m, len(activesNodes)-1), nodes, activesNodes, totalProfile)
 
-    n = int(math.log2(len(nodes))) + 3
-    perform_nni_rounds(nodes, n)
+    if VERBOSE:
+        print('performing NNI...')
+    perform_nni_rounds(nodes, len(nodes))
+
+
+    if VERBOSE:
+        print('computing branch lengths')
+
+    branchLengths = []
+    for node in nodes:
+        if node == 0:
+            branchLengths.append((node, node, 0))
+            nodes[node].distanceToParent = 0
+        else:
+            parent = nodes[nodes[node].parent]
+            branchLengths.append((node, parent.nodeId, branchLength(parent, nodes[node], nodes)))
+            nodes[node].distanceToParent = branchLength(parent, nodes[node], nodes)
+
+    print('newick output:')
     print(createNewick(nodes))
