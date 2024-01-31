@@ -508,7 +508,7 @@ def branchLength(parent: Node, child: Node, nodes):
                         log_corrected_distance(nodeB, nodeR) + log_corrected_distance(nodeB, nodeC)) / 4 - (
                         log_corrected_distance(nodeA, nodeB) + log_corrected_distance(nodeR, nodeC)) / 2
 
-    return branchLength
+    return branchLength if branchLength >= 0 else 0
 
 
 
@@ -598,6 +598,9 @@ if __name__ == '__main__':
     perform_nni_rounds(nodes, len(nodes))
 
 
+    if VERBOSE:
+        print('computing branch lengths')
+
     branchLengths = []
     for node in nodes:
         if node == 0:
@@ -608,13 +611,5 @@ if __name__ == '__main__':
             branchLengths.append((node, parent.nodeId, branchLength(parent, nodes[node], nodes)))
             nodes[node].distanceToParent = branchLength(parent, nodes[node], nodes)
 
-    print(branchLengths)
+    print('newick output:')
     print(createNewick(nodes))
-
-    # print(nodes[9].children)
-    # print(nodes[12].children)
-    # print(profileDistance(nodes[12].profile, nodes[9].profile))
-    # print(nodes[9].upDistance)
-    # print(nodes[12].upDistance)
-    # print(nodeDistance(nodes[9], nodes[12]))
-    # print(branchLength(nodes[9], nodes[12], nodes))
