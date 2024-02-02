@@ -197,7 +197,6 @@ class TestFasttreeMethods(unittest.TestCase):
             for c in 'ACGT':
                 self.assertAlmostEqual(expectedProfile[i][c], totalProfile[i][c])
     def testBranchLengths(self):
-
         nodes = {
             0: main.Node(0, -1, main.initializeProfile('', 4, 'ACGT')),
             1: main.Node(1, 0, profile=main.initializeProfile('ACGT', 4, 'ACGT')),
@@ -206,11 +205,13 @@ class TestFasttreeMethods(unittest.TestCase):
             4: main.Node(4, 0, profile=main.initializeProfile('ACGA', 4, 'ACGT'))
         }
         nodes[0].children = [1, 2, 3, 4]
-        node5 = main.mergeNodes(nodes[1], nodes[2], 2, nodes)
+        totalProfile = main.computeTotalProfile(nodes)
+        node5 = main.mergeNodes(nodes[1], nodes[2], 2, nodes, totalProfile)
         nodes[node5.nodeId] = node5
-        node6 = main.mergeNodes(nodes[3], nodes[4], 2, nodes)
+        node6 = main.mergeNodes(nodes[3], nodes[4], 2, nodes, totalProfile)
         nodes[node6.nodeId] = node6
-        print(main.branchLength(node5, node6, nodes))
+        self.assertAlmostEqual(0.37398669, main.branchLength(node5, node6, nodes))
+
 class TestNNIFunctions(unittest.TestCase):
 
     def setUp(self):
@@ -243,7 +244,7 @@ class TestNNIFunctions(unittest.TestCase):
         profile1 = self.nodes[1].profile
         profile2 = self.nodes[2].profile
         # This is a simplified test; you should replace it with your actual log-corrected distance function
-        distance = main.log_corrected_distance(profile1, profile2)
+        distance = main.log_corrected_distance(self.nodes[1], self.nodes[2])
         self.assertGreater(distance, 0)  # Check if the distance is positive
 
     def testNNISwap(self):

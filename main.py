@@ -143,18 +143,21 @@ REFRESH_FACTOR = 0.8
 # ======================= Util functions ====================================
 def readFile(fileName: str) -> list[tuple[str, str]]:
     """
-    Reads the file with the input data and parses it
+    Reads the file with the input data and parses it. If the data is invalid we terminate the script early.
     :param fileName: The name of the file to where the input data resides
-    :return: the data as a list of all sequences
+    :return: the data as a list of a combination of sequences and their labels
     """
-    with open(fileName, 'r') as file:
-        rawData = file.readlines()
+    try:
+        with open(fileName, 'r') as file:
+            rawData = file.readlines()
+        data = []
+        for i in range(0, len(rawData), 2):
+            data.append((rawData[i].strip()[1:], rawData[i+1].strip()))
 
-    data = []
-    for i in range(0, len(rawData), 2):
-        data.append((rawData[i].strip()[1:], rawData[i+1].strip()))
-
-    return data
+        return data
+    except:
+        print('please provide a valid data file')
+        sys.exit(1)
 
 def createNewick(nodes, currentNode: int = ROOT_NODE_ID) -> str:
     """
@@ -293,11 +296,10 @@ def nodeDistance(node1: Node, node2: Node) -> float:
     return profileDistance(node1.profile, node2.profile) - node1.upDistance - node2.upDistance
 
 
-
-def calculateOutDistance(node: Node, activesNodes: list[int], nodes: nodeList, totalProfile):
+def calculateOutDistance(node: Node, activeNodes: list[int], nodes: nodeList, totalProfile) -> float:
     sum = 0
-    n = len(activesNodes)
-    for j in activesNodes:
+    n = len(activeNodes)
+    for j in activeNodes:
         sum += nodes[j].upDistance
 
     outDistance = n*profileDistance(node.profile, totalProfile) - profileDistance(node.profile, node.profile) \
@@ -359,7 +361,7 @@ def mergeNodes(node1: Node, node2: Node, m: int, nodes: nodeList, totalProfile: 
     node2.active = False
     return newNode
 
-def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int], totalProfile: profile):
+def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int], totalProfile: profile) -> None:
     seedSequences = nodes[ROOT_NODE_ID].children.copy()
 
     while seedSequences != []:
@@ -383,7 +385,7 @@ def initialize_top_hits(m: int, nodes: nodeList, activeNodes: list[int], totalPr
                 neighbourNode.approximate_top_hits(top_hits, m, nodes, totalProfile)
                 seedSequences.remove(neighbour)
 
-def refresh_top_hits(node: Node, m: int, nodes: nodeList, activesNodes: list[int], totalProfile: profile):
+def refresh_top_hits(node: Node, m: int, nodes: nodeList, activeNodes: list[int], totalProfile: profile) -> None:
     """
     Creates a new top_hits list for a node, and refreshed the top hits of all m (or less if len(active nodes) < m) hits.
     :param node: the Node to refresh
@@ -392,29 +394,16 @@ def refresh_top_hits(node: Node, m: int, nodes: nodeList, activesNodes: list[int
     :param activeNodes: The list of active nodes.
     :param totalProfile: The current total profile over all active nodes
     """
-    top_hits = node.initialize_top_hits(nodes, activesNodes, m, totalProfile)
+    top_hits = node.initialize_top_hits(nodes, activeNodes, m, totalProfile)
     for neighbour, _ in top_hits[:m]:
         neighbourNode = nodes[neighbour]
-        neighbourNode.merge_top_hits(top_hits, m, nodes, activesNodes, totalProfile)
+        neighbourNode.merge_top_hits(top_hits, m, nodes, activeNodes, totalProfile)
     node.age = 0
 
-def findBestJoin(topHits: topHitsList):
-    bestCandidate = None
-    bestCriterion = float("inf")
-    for hit in topHits:
-        node = hit[0].findActiveAncestor(nodeList)
-        node.age += 1
-        distance = hit[1]
-
-        if distance < bestCriterion:
-            bestCandidate = node
-            bestCriterion = distance
-
-    return bestCandidate
-
-def log_corrected_distance(node1, node2):
+def log_corrected_distance(node1: Node, node2: Node) -> float:
     # Implement the log-corrected distance calculation between two profiles
-    val = -1.3 * math.log(1 - profileDistance(node1.profile, node2.profile))
+    profileDist = profileDistance(node1.profile, node2.profile)
+    val = -1.3 * math.log(1 - (profileDist if profileDist < 1 else 0.999))
     return val
 
 
@@ -512,9 +501,6 @@ def branchLength(parent: Node, child: Node, nodes):
                         log_corrected_distance(nodeA, nodeB) + log_corrected_distance(nodeR, nodeC)) / 2
 
     return branchLength if branchLength >= 0 else 0
-
-
-
 
 # =============================== Algorithm =======================================
 
